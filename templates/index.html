@@ -1,0 +1,120 @@
+<!-- VERSION: 2024-07-22-unique -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Braille STL Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        #viewer { width: 600px; height: 400px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Braille STL Generator</h1>
+    <form id="braille-form">
+        <label for="text">Enter text (up to 4 lines):</label><br>
+        <textarea id="text" name="text" rows="4" cols="50" maxlength="51" placeholder="Enter your text here..."></textarea><br>
+        <button type="submit">Generate STL</button>
+    </form>
+    <div id="error-message" style="color: red; margin-top: 1em;"></div>
+    <div id="viewer"></div>
+    <button id="download-btn" style="display:none; margin-top:1em;">Download STL</button>
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@<0.178.0/examples/jsm/"
+          }
+        }
+        </script>
+    <script type="module">
+        import * as THREE from '/static/three.module.js';
+        import { STLLoader } from '/static/STLLoader.js';
+        import { OrbitControls } from '/static/OrbitControls.js';
+
+        const form = document.getElementById('braille-form');
+        const viewer = document.getElementById('viewer');
+        const downloadBtn = document.getElementById('download-btn');
+        let renderer, scene, camera, mesh, controls;
+        let lastSTLUrl = null;
+
+        function init3D() {
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(600, 400);
+            viewer.innerHTML = '';
+            viewer.appendChild(renderer.domElement);
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, 600/400, 0.1, 1000);
+            camera.position.set(0, -80, 60);
+            camera.lookAt(0, 0, 0);
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(0, 0, 100).normalize();
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x888888));
+        }
+
+        function render() {
+            renderer.render(scene, camera);
+        }
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = '';
+            const text = document.getElementById('text').value;
+            const res = await fetch('/generate_braille_stl', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word: text })
+            });
+            if (!res.ok) {
+                let msg = 'Error generating STL';
+                try {
+                    const data = await res.json();
+                    if (data.error) msg = data.error;
+                } catch {}
+                errorDiv.textContent = msg;
+                return;
+            }
+            const blob = await res.blob();
+            if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
+            lastSTLUrl = URL.createObjectURL(blob);
+            loadSTL(lastSTLUrl);
+            downloadBtn.style.display = 'inline-block';
+            downloadBtn.onclick = () => {
+                const a = document.createElement('a');
+                a.href = lastSTLUrl;
+                a.download = 'braille_card.stl';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+        };
+
+        function loadSTL(url) {
+            init3D();
+            const loader = new STLLoader();
+            loader.load(url, function (geometry) {
+                if (mesh) scene.remove(mesh);
+                const material = new THREE.MeshPhongMaterial({ color: 0x6699cc, specular: 0x111111, shininess: 200 });
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.rotation.x = -Math.PI / 2;
+                scene.add(mesh);
+                animate();
+            }, undefined, function (error) {
+                alert('Failed to load STL: ' + error);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            // Removed mesh rotation for no auto-spin
+            controls && controls.update();
+            render();
+        }
+    </script>
+</body>
+</html> 
