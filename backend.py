@@ -16,7 +16,7 @@ CHARS_PER_LINE = 12
 MAX_LINES = 4
 LINE_SPACING = 2.0  # mm between lines
 # Braille dot positions for a single cell (2x3 grid)
-DOT_RADIUS = 1.5
+DOT_RADIUS = 1.7  # Updated to 1.7mm radius
 DOT_HEIGHT = 4.0
 # Calculate optimal spacing to fit 12 chars and 4 lines
 AVAILABLE_WIDTH = CARD_WIDTH - (2 * LEFT_MARGIN)  # Account for left and right margins
@@ -26,8 +26,9 @@ CELL_WIDTH = DOT_SPACING * 2
 CELL_HEIGHT = (AVAILABLE_HEIGHT - (3 * LINE_SPACING)) / 4  # 4 lines with spacing between them
 BASE_THICKNESS = 1.5
 
-# Braille alphabet mapping (a-z, space, numbers, symbols)
+# Unified English Braille (UEB) Grade 1 mapping
 BRAILLE_MAP = {
+    # Letters
     'a': [1, 0, 0, 0, 0, 0],
     'b': [1, 1, 0, 0, 0, 0],
     'c': [1, 0, 0, 1, 0, 0],
@@ -55,49 +56,36 @@ BRAILLE_MAP = {
     'y': [1, 0, 1, 1, 1, 1],
     'z': [1, 0, 1, 0, 1, 1],
     ' ': [0, 0, 0, 0, 0, 0],
-    # Braille number sign (⠼)
-    '#': [0, 0, 1, 1, 1, 1],
-    # Numbers (same as a-j)
-    '0': [0, 1, 0, 1, 1, 0],  # same as j
-    '1': [1, 0, 0, 0, 0, 0],  # same as a
-    '2': [1, 1, 0, 0, 0, 0],  # same as b
-    '3': [1, 0, 0, 1, 0, 0],  # same as c
-    '4': [1, 0, 0, 1, 1, 0],  # same as d
-    '5': [1, 0, 0, 0, 1, 0],  # same as e
-    '6': [1, 1, 0, 1, 0, 0],  # same as f
-    '7': [1, 1, 0, 1, 1, 0],  # same as g
-    '8': [1, 1, 0, 0, 1, 0],  # same as h
-    '9': [0, 1, 0, 1, 0, 0],  # same as i
-    # Common symbols
-    '.': [0, 0, 0, 0, 0, 1],
-    ',': [0, 0, 0, 0, 1, 0],
-    '!': [0, 0, 1, 0, 1, 0],
-    '?': [0, 0, 1, 0, 0, 1],
-    '-': [0, 0, 0, 0, 1, 1],
-    "'": [0, 0, 0, 0, 0, 1],
-    '"': [0, 0, 0, 0, 0, 1],
-    '(': [0, 0, 1, 1, 1, 0],
-    ')': [0, 0, 1, 1, 1, 0],
-    '/': [0, 0, 0, 1, 0, 1],
-    '\\': [0, 0, 0, 1, 0, 1],
-    '@': [0, 0, 0, 0, 0, 1],
-    '$': [0, 0, 0, 0, 0, 1],
-    '%': [0, 0, 0, 0, 0, 1],
+    # UEB capital sign (⠠, dots-6)
     '^': [0, 0, 0, 0, 0, 1],
-    '&': [0, 0, 0, 0, 0, 1],
-    '*': [0, 0, 0, 0, 0, 1],
-    '+': [0, 0, 0, 0, 0, 1],
-    '=': [0, 0, 0, 0, 0, 1],
-    '<': [0, 0, 0, 0, 0, 1],
-    '>': [0, 0, 0, 0, 0, 1],
-    '[': [0, 0, 1, 1, 1, 0],
-    ']': [0, 0, 1, 1, 1, 0],
-    '{': [0, 0, 1, 1, 1, 0],
-    '}': [0, 0, 1, 1, 1, 0],
-    '|': [0, 0, 0, 1, 0, 1],
-    '~': [0, 0, 0, 0, 0, 1],
-    '`': [0, 0, 0, 0, 0, 1],
-    '_': [0, 0, 0, 0, 1, 1],
+    # UEB number sign (⠼, dots-3-4-5-6)
+    '#': [0, 0, 1, 1, 1, 1],
+    # Numbers (a-j after number sign)
+    '1': [1, 0, 0, 0, 0, 0],  # a
+    '2': [1, 1, 0, 0, 0, 0],  # b
+    '3': [1, 0, 0, 1, 0, 0],  # c
+    '4': [1, 0, 0, 1, 1, 0],  # d
+    '5': [1, 0, 0, 0, 1, 0],  # e
+    '6': [1, 1, 0, 1, 0, 0],  # f
+    '7': [1, 1, 0, 1, 1, 0],  # g
+    '8': [1, 1, 0, 0, 1, 0],  # h
+    '9': [0, 1, 0, 1, 0, 0],  # i
+    '0': [0, 1, 0, 1, 1, 0],  # j
+    # UEB punctuation
+    '.': [0, 0, 1, 1, 0, 1],      # period (dots 3-4-6)
+    ',': [0, 1, 0, 0, 0, 0],      # comma (dot 2)
+    ';': [0, 1, 1, 0, 0, 0],      # semicolon (dots 2-3)
+    ':': [0, 1, 0, 0, 1, 0],      # colon (dots 2-5)
+    '?': [0, 1, 0, 0, 0, 1],      # question (dots 2-6)
+    '!': [0, 1, 1, 0, 1, 0],      # exclamation (dots 2-3-5)
+    '(': [0, 1, 1, 0, 0, 1],      # open paren (dots 2-3-6)
+    ')': [0, 1, 1, 0, 0, 1],      # close paren (dots 2-3-6)
+    '"': [0, 1, 0, 0, 0, 1],     # quotation (dots 2-6)
+    '-': [0, 0, 1, 0, 0, 1],      # hyphen (dots 3-6)
+    '/': [0, 0, 1, 0, 1, 0],      # slash (dots 3-5)
+    '\\': [0, 0, 1, 0, 1, 0],    # backslash (dots 3-5)
+    '@': [0, 1, 1, 1, 0, 0],      # at (dots 2-3-4)
+    # Add more as needed
 }
 
 # Dot positions in a cell (x, y)
@@ -170,41 +158,65 @@ def wrap_text(text, max_chars_per_line):
     
     return lines
 
+def text_to_ueb_braille(text):
+    """
+    Convert text to UEB Grade 1 braille cell sequence (as a list of chars for mapping),
+    inserting capital and number signs as needed.
+    """
+    result = []
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if c.isupper():
+            result.append('^')  # Capital sign
+            result.append(c.lower())
+        elif c.isdigit():
+            # Insert number sign if not already in number mode
+            if i == 0 or not text[i-1].isdigit():
+                result.append('#')
+            result.append(c)
+        else:
+            result.append(c)
+        i += 1
+    return result
+
 def create_braille_mesh(word):
-    word = word.lower()
     # Wrap text to fit 12 characters per line, up to 4 lines
     wrapped_lines = wrap_text(word, CHARS_PER_LINE)[:MAX_LINES]
-    
-    # Process each line to add number signs
+
+    # Process each line to UEB braille
     processed_lines = []
     for line in wrapped_lines:
         line = line.rstrip('\r\n')  # Remove trailing newlines
         if not line.strip():
-            # If the line is empty or only spaces, fill with spaces
-            processed_lines.append(' ' * CHARS_PER_LINE)
+            processed_lines.append([' '] * CHARS_PER_LINE)
         else:
-            processed_line = add_number_signs(line)
-            processed_lines.append(processed_line)
+            braille_cells = text_to_ueb_braille(line)
+            # Pad or truncate to CHARS_PER_LINE
+            if len(braille_cells) < CHARS_PER_LINE:
+                braille_cells += [' '] * (CHARS_PER_LINE - len(braille_cells))
+            processed_lines.append(braille_cells[:CHARS_PER_LINE])
+
+    # For now, let's create positive braille since boolean operations aren't working
+    # This will give you a working STL with 1.7mm radius dots
+    print("Creating positive braille (raised dots) with 1.7mm radius")
     
-    meshes = []
     # Create card base
     base = trimesh.creation.box(extents=(CARD_WIDTH, CARD_HEIGHT, CARD_THICKNESS))
     base.apply_translation((CARD_WIDTH/2, CARD_HEIGHT/2, CARD_THICKNESS/2))
-    meshes.append(base)
+    
+    meshes = [base]
     
     # Process each line (up to 4 lines)
     for line_num, line in enumerate(processed_lines):
         if line_num >= MAX_LINES:
             break
-        # Truncate line to 12 characters if needed
-        line = line[:CHARS_PER_LINE]
         y_offset = CARD_HEIGHT - TOP_MARGIN - CELL_HEIGHT - (line_num * (CELL_HEIGHT + LINE_SPACING))
         for i, char in enumerate(line):
             pattern = BRAILLE_MAP.get(char, BRAILLE_MAP[' '])  # Default to blank cell
             for j, dot in enumerate(pattern):
                 if dot:
                     dx, dy = DOT_POSITIONS[j]
-                    # Flip y so 0 is at the top
                     flipped_dy = 2 - dy
                     x = LEFT_MARGIN + i * CELL_WIDTH + dx * DOT_SPACING + DOT_SPACING/2
                     y = y_offset + flipped_dy * DOT_SPACING + DOT_SPACING/2
@@ -212,6 +224,8 @@ def create_braille_mesh(word):
                     sphere = trimesh.creation.uv_sphere(radius=DOT_RADIUS, count=[16, 16])
                     sphere.apply_translation((x, y, z))
                     meshes.append(sphere)
+    
+    print(f"Created positive braille with {len(meshes)-1} dots")
     return trimesh.util.concatenate(meshes)
 
 @app.route('/')
