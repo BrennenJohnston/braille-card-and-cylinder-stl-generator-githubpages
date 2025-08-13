@@ -1,9 +1,9 @@
-<!-- VERSION: 2024-07-22-pretty -->
+<!-- VERSION: 2024-12-19-revised -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Braille STL Generator</title>
+    <title>Braille Business Card STL Generator</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
         body {
@@ -67,45 +67,128 @@
             color: #2d3748;
             text-align: left;
         }
+        .info-panel {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1em;
+            margin-bottom: 1.5em;
+            font-size: 0.9em;
+            color: #4a5568;
+        }
+        .info-panel p {
+            margin: 0.3em 0;
+        }
+        .grade-selection {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1em;
+            margin-bottom: 1.5em;
+        }
+        .grade-label {
+            font-weight: 600;
+            color: #2d3748;
+            display: block;
+            margin-bottom: 0.8em;
+            font-size: 0.9em;
+        }
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6em;
+        }
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 0.6em;
+            cursor: pointer;
+            font-size: 0.9em;
+            color: #4a5568;
+        }
+        .radio-option input[type="radio"] {
+            margin: 0;
+            cursor: pointer;
+        }
+        .radio-text {
+            cursor: pointer;
+        }
         form {
             display: flex;
             flex-direction: column;
             gap: 1.1em;
         }
-        label {
-            font-weight: 500;
-            color: #444;
-            margin-bottom: 0.2em;
+        .line-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8em;
         }
-        textarea {
+        .line-input {
+            display: flex;
+            align-items: center;
+            gap: 0.8em;
+        }
+        .line-label {
+            font-weight: 600;
+            color: #2d3748;
+            min-width: 60px;
+            font-size: 0.9em;
+        }
+        input[type="text"] {
+            flex: 1;
             border: 1.5px solid #cbd5e1;
             border-radius: 8px;
             padding: 0.8em;
             font-size: 1em;
             font-family: inherit;
-            resize: none;
             background: #f9fafb;
             transition: border 0.2s;
         }
-        textarea:focus {
+        input[type="text"]:focus {
             border: 1.5px solid #3182ce;
             outline: none;
             background: #fff;
         }
-        button[type="submit"] {
-            background: linear-gradient(90deg, #3182ce 60%, #63b3ed 100%);
-            color: #fff;
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8em;
+            margin-top: 1em;
+        }
+        button {
             border: none;
             border-radius: 8px;
             padding: 0.7em 0;
             font-size: 1.1em;
             font-weight: 600;
             cursor: pointer;
-            box-shadow: 0 2px 8px rgba(49,130,206,0.08);
             transition: background 0.2s, transform 0.1s;
+        }
+        button[type="submit"] {
+            background: linear-gradient(90deg, #3182ce 60%, #63b3ed 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(49,130,206,0.08);
         }
         button[type="submit"]:hover {
             background: linear-gradient(90deg, #2563eb 60%, #4299e1 100%);
+            transform: translateY(-2px) scale(1.03);
+        }
+        #download-btn {
+            display: none;
+            background: linear-gradient(90deg, #3182ce 60%, #63b3ed 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(49,130,206,0.08);
+        }
+        #download-btn:hover {
+            background: linear-gradient(90deg, #2563eb 60%, #4299e1 100%);
+            transform: translateY(-2px) scale(1.03);
+        }
+        #download-counter-plate-btn {
+            background: #6b7280;
+            color: #fff;
+        }
+        #download-counter-plate-btn:hover {
+            background: #4b5563;
             transform: translateY(-2px) scale(1.03);
         }
         #error-message {
@@ -119,24 +202,6 @@
             display: none;
             align-items: center;
             gap: 0.5em;
-        }
-        #download-btn {
-            display: none;
-            margin: 0.5em auto 0 auto;
-            background: #38a169;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            padding: 0.7em 1.5em;
-            font-size: 1.1em;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(56,161,105,0.08);
-            transition: background 0.2s, transform 0.1s;
-        }
-        #download-btn:hover {
-            background: #2f855a;
-            transform: translateY(-2px) scale(1.03);
         }
         @media (max-width: 1100px) {
             .main-layout {
@@ -162,6 +227,14 @@
             #viewer {
                 height: 220px;
             }
+            .line-input {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.3em;
+            }
+            .line-label {
+                min-width: unset;
+            }
         }
     </style>
 </head>
@@ -172,23 +245,111 @@
             <button id="download-btn">Download STL</button>
         </div>
         <div class="form-section">
-            <h1>Braille STL Generator</h1>
+            <h1>Braille Business Card STL Generator</h1>
+            
+            <div class="info-panel">
+                <p><strong>For Business Cards:</strong> 3.5 in × 2 in</p>
+                <p><strong>Up to 4 braille lines</strong> (You will be alerted if a line exceeds capacity.)</p>
+            </div>
+            
             <form id="braille-form">
-                <label for="text">Enter text (up to 4 lines, 12 characters per line):</label>
-                <textarea id="text" name="text" rows="4" cols="50" maxlength="48" placeholder="Enter your text here..."></textarea>
-                <button type="submit">Generate STL</button>
+                <div class="line-input-group">
+                    <label class="grade-label">Pre-Translated Braille (See instructions for details)</label>
+                    <div class="line-input">
+                        <span class="line-label">Line 1</span>
+                        <input type="text" id="line1" name="line1" placeholder="Paste your pre-translated Braille characters here." maxlength="50">
+                    </div>
+                    <div class="line-input">
+                        <span class="line-label">Line 2</span>
+                        <input type="text" id="line2" name="line2" placeholder="Paste your pre-translated Braille characters here." maxlength="50">
+                    </div>
+                    <div class="line-input">
+                        <span class="line-label">Line 3</span>
+                        <input type="text" id="line3" name="line3" placeholder="Paste your pre-translated Braille characters here." maxlength="50">
+                    </div>
+                    <div class="line-input">
+                        <span class="line-label">Line 4</span>
+                        <input type="text" id="line4" name="line4" placeholder="Paste your pre-translated Braille characters here." maxlength="50">
+                    </div>
+                </div>
+
+                <div class="grade-selection">
+                    <label class="grade-label">Plate Type (Select which model to generate)</label>
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="plate_type" value="positive" checked>
+                            <span class="radio-text">Emboss Plate (Raised Dots)</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="plate_type" value="negative">
+                            <span class="radio-text">Universal Counter Plate (Recessed Dots)</span>
+                        </label>
+                        <div id="negative-plate-offset-container" style="display: none; margin-top: 10px;">
+                            <label for="negative_plate_offset">Negative Plate Offset:</label>
+                            <input type="number" id="negative_plate_offset" name="negative_plate_offset" value="0.4" step="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grade-selection">
+                    <label class="grade-label">Plate Adjustments (Changes apply to both Emboss and Counter Plate)</label>
+                </div>
+
+                <div class="grade-selection">
+                    <label class="grade-label">Braille Dimensions</label>
+                    <div>
+                        <label for="grid_columns">Number of Braille Cells (Characters):</label>
+                        <input type="number" id="grid_columns" name="grid_columns" value="13">
+                    </div>
+                    <div>
+                        <label for="grid_rows">Number of Braille Lines:</label>
+                        <input type="number" id="grid_rows" name="grid_rows" value="4">
+                    </div>
+                    <div>
+                        <label for="cell_spacing">Braille Cell Spacing:</label>
+                        <input type="number" id="cell_spacing" name="cell_spacing" value="7.0" step="0.1">
+                    </div>
+                    <div>
+                        <label for="line_spacing">Braille Line Spacing:</label>
+                        <input type="number" id="line_spacing" name="line_spacing" value="12.0" step="0.1">
+                    </div>
+                    <div>
+                        <label for="dot_spacing">Braille Dot Spacing:</label>
+                        <input type="number" id="dot_spacing" name="dot_spacing" value="2.5" step="0.1">
+                    </div>
+                </div>
+
+                <div class="grade-selection">
+                    <label class="grade-label">Dot Dimensions</label>
+                    <div>
+                        <label for="dot_base_diameter">Dot diameter:</label>
+                        <input type="number" id="dot_base_diameter" name="dot_base_diameter" value="2.0" step="0.1">
+                    </div>
+                    <div>
+                        <label for="dot_height">Dot height:</label>
+                        <input type="number" id="dot_height" name="dot_height" value="1.4" step="0.1">
+                    </div>
+                    <div>
+                        <label for="dot_hat_size">Flat hat diameter:</label>
+                        <input type="number" id="dot_hat_size" name="dot_hat_size" value="0.8" step="0.1">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit">Generate STL</button>
+                    <button type="button" id="download-counter-plate-btn">Download Universal Counter Plate (Recessed Dots)</button>
+                </div>
             </form>
-            <div id="error-message"><span style="font-weight:bold;">&#9888;</span> <span id="error-text"></span></div>
+            
+            <div id="error-message">
+                <span style="font-weight:bold;">⚠</span> 
+                <span id="error-text"></span>
+            </div>
         </div>
     </div>
-    <script type="importmap">
-        {
-          "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@<0.178.0/examples/jsm/"
-          }
-        }
-        </script>
+    
+
+    
     <script type="module">
         import * as THREE from '/static/three.module.js';
         import { STLLoader } from '/static/STLLoader.js';
@@ -197,10 +358,18 @@
         const form = document.getElementById('braille-form');
         const viewer = document.getElementById('viewer');
         const downloadBtn = document.getElementById('download-btn');
+        const downloadCounterPlateBtn = document.getElementById('download-counter-plate-btn');
         const errorDiv = document.getElementById('error-message');
         const errorText = document.getElementById('error-text');
+        const negativePlateOffsetContainer = document.getElementById('negative-plate-offset-container');
         let renderer, scene, camera, mesh, controls;
         let lastSTLUrl = null;
+
+        document.querySelectorAll('input[name="plate_type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                negativePlateOffsetContainer.style.display = this.value === 'negative' ? 'block' : 'none';
+            });
+        });
 
         function init3D() {
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -209,7 +378,7 @@
             viewer.appendChild(renderer.domElement);
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(45, viewer.clientWidth/viewer.clientHeight, 0.1, 1000);
-            camera.position.set(0, 0, 120); // Camera in front, looking at origin
+            camera.position.set(0, 0, 120);
             camera.lookAt(0, 0, 0);
             controls = new OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0);
@@ -228,46 +397,140 @@
             e.preventDefault();
             errorDiv.style.display = 'none';
             errorText.textContent = '';
-            const text = document.getElementById('text').value;
+            
+            // Collect all line inputs
+            const lines = [
+                document.getElementById('line1').value,
+                document.getElementById('line2').value,
+                document.getElementById('line3').value,
+                document.getElementById('line4').value
+            ];
+            
+            const plateType = document.querySelector('input[name="plate_type"]:checked').value;
+            const settings = {
+                grid_columns: document.getElementById('grid_columns').value,
+                grid_rows: document.getElementById('grid_rows').value,
+                cell_spacing: document.getElementById('cell_spacing').value,
+                line_spacing: document.getElementById('line_spacing').value,
+                dot_spacing: document.getElementById('dot_spacing').value,
+                dot_base_diameter: document.getElementById('dot_base_diameter').value,
+                dot_height: document.getElementById('dot_height').value,
+                dot_hat_size: document.getElementById('dot_hat_size').value,
+                negative_plate_offset: document.getElementById('negative_plate_offset').value
+            };
+            
+            // Check if at least one line has content
+            if (lines.every(line => !line.trim())) {
+                errorText.textContent = 'Please enter text in at least one line.';
+                errorDiv.style.display = 'flex';
+                return;
+            }
+            
             const res = await fetch('/generate_braille_stl', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word: text })
+                body: JSON.stringify({ lines: lines, grade: 'g1', plate_type: plateType, settings: settings })
             });
+            
             if (!res.ok) {
                 let msg = 'Error generating STL';
                 try {
                     const data = await res.json();
                     if (data.error) msg = data.error;
-                } catch {}
+                } catch (e) {
+                    msg = `Server error: ${res.status} ${res.statusText}`;
+                }
                 errorText.textContent = msg;
                 errorDiv.style.display = 'flex';
                 return;
             }
-            const blob = await res.blob();
-            if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
-            lastSTLUrl = URL.createObjectURL(blob);
-            loadSTL(lastSTLUrl);
-            downloadBtn.style.display = 'inline-block';
-            downloadBtn.onclick = () => {
+            
+            try {
+                const blob = await res.blob();
+                if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
+                lastSTLUrl = URL.createObjectURL(blob);
+                loadSTL(lastSTLUrl);
+                downloadBtn.style.display = 'inline-block';
+                downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = lastSTLUrl;
+                    a.download = 'braille_card.stl';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+            } catch (e) {
+                errorText.textContent = 'Failed to process STL file: ' + e.message;
+                errorDiv.style.display = 'flex';
+            }
+        };
+
+        downloadCounterPlateBtn.onclick = async () => {
+            errorDiv.style.display = 'none';
+            errorText.textContent = '';
+
+            const settings = {
+                grid_columns: document.getElementById('grid_columns').value,
+                grid_rows: document.getElementById('grid_rows').value,
+                cell_spacing: document.getElementById('cell_spacing').value,
+                line_spacing: document.getElementById('line_spacing').value,
+                dot_spacing: document.getElementById('dot_spacing').value,
+                dot_base_diameter: document.getElementById('dot_base_diameter').value,
+                dot_height: document.getElementById('dot_height').value,
+                dot_hat_size: document.getElementById('dot_hat_size').value,
+                negative_plate_offset: document.getElementById('negative_plate_offset').value
+            };
+
+            try {
+                const res = await fetch('/generate_counter_plate_stl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ settings: settings })
+                });
+
+                if (!res.ok) {
+                    let msg = 'Error generating counter plate';
+                    try {
+                        const data = await res.json();
+                        if (data.error) msg = data.error;
+                    } catch (e) {
+                        msg = `Server error: ${res.status} ${res.statusText}`;
+                    }
+                    errorText.textContent = msg;
+                    errorDiv.style.display = 'flex';
+                    return;
+                }
+                
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                
                 const a = document.createElement('a');
-                a.href = lastSTLUrl;
-                a.download = 'braille_card.stl';
+                a.href = url;
+                a.download = 'universal_counter_plate.stl';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-            };
+                URL.revokeObjectURL(url);
+
+            } catch (e) {
+                errorText.textContent = 'Failed to generate or download counter plate: ' + e.message;
+                errorDiv.style.display = 'flex';
+            }
         };
 
         function loadSTL(url) {
             init3D();
             const loader = new STLLoader();
             loader.load(url, function (geometry) {
-                geometry.center(); // Center the geometry at the origin
+                geometry.center();
                 if (mesh) scene.remove(mesh);
-                const material = new THREE.MeshPhongMaterial({ color: 0x6699cc, specular: 0x111111, shininess: 200 });
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: 0x6699cc, 
+                    specular: 0x111111, 
+                    shininess: 200 
+                });
                 mesh = new THREE.Mesh(geometry, material);
-                mesh.rotation.x = 0; // No rotation, face forward
+                mesh.rotation.x = 0;
                 scene.add(mesh);
                 animate();
             }, undefined, function (error) {
@@ -281,6 +544,12 @@
             controls && controls.update();
             render();
         }
+        
+        // Initialize 3D viewer on page load
+        window.addEventListener('load', () => {
+            init3D();
+            animate();
+        });
     </script>
 </body>
 </html> 
