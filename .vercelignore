@@ -10,6 +10,7 @@ third_party/liblouis/
 !node_modules/liblouis-build/
 !node_modules/liblouis/
 !static/liblouis-worker.js
+!static/liblouis/
 
 # Git and development files
 .git/
