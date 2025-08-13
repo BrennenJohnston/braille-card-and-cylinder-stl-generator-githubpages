@@ -203,7 +203,7 @@ def create_positive_plate_mesh(lines, grade="g1", settings=None):
     if settings is None:
         settings = CardSettings()
 
-    grade_name = "Pre-translated"
+    grade_name = f"Grade {grade.upper()}" if grade in ["g1", "g2"] else "Grade 1"
     print(f"Creating positive plate mesh with {grade_name} characters")
     print(f"Grid: {settings.grid_columns} columns × {settings.grid_rows} rows")
     print(f"Centering grid. Auto-calculated margins: Left/Right {settings.left_margin:.2f}mm, Top/Bottom {settings.top_margin:.2f}mm")
@@ -229,8 +229,13 @@ def create_positive_plate_mesh(lines, grade="g1", settings=None):
         if not line_text:
             continue
             
-        braille_text = line_text
-        print(f"Line {row_num + 1}: '{line_text}'")
+        # Translate English text to braille using liblouis
+        try:
+            braille_text = translate_with_liblouis(line_text, grade)
+            print(f"Line {row_num + 1}: '{line_text}' → '{braille_text}'")
+        except Exception as e:
+            print(f"Warning: Failed to translate line {row_num + 1}, using original text: {e}")
+            braille_text = line_text
         
         # Check if braille text exceeds grid capacity
         if len(braille_text) > settings.grid_columns:
@@ -360,20 +365,54 @@ def create_extruded_negative_plate(settings: CardSettings):
     if not circles:
         raise RuntimeError("No cutouts generated for fallback counter plate")
 
-    top_layer_polygon = rect.difference(unary_union(circles))
+    # Create a simpler approach: just create a base plate with holes
+    # We'll use the boolean difference but handle it more carefully
+    try:
+        # Try to create a single union of all circles
+        circles_union = unary_union(circles)
+        
+        # Create the top layer by subtracting circles from the rectangle
+        if hasattr(circles_union, 'geoms'):
+            # MultiPolygon case - subtract each circle individually
+            top_layer_polygon = rect
+            for circle in circles_union.geoms:
+                if top_layer_polygon.is_valid:
+                    top_layer_polygon = top_layer_polygon.difference(circle)
+        else:
+            # Single polygon case
+            top_layer_polygon = rect.difference(circles_union)
+            
+        # Ensure the polygon is valid
+        if not top_layer_polygon.is_valid:
+            top_layer_polygon = top_layer_polygon.buffer(0)
+            
+    except Exception as e:
+        print(f"Complex polygon operations failed, using simple approach: {e}")
+        # Fallback: create a simple plate without cutouts
+        top_layer_polygon = rect
 
+    # Create the meshes
     bottom_height = settings.card_thickness - settings.recessed_dot_height
     top_height = settings.recessed_dot_height
 
-    bottom_mesh = extrude_polygon(rect, bottom_height)
-    top_mesh = extrude_polygon(top_layer_polygon, top_height)
-    top_mesh.apply_translation([0, 0, bottom_height])
-
-    plate = trimesh.util.concatenate([bottom_mesh, top_mesh])
+    try:
+        bottom_mesh = extrude_polygon(rect, bottom_height)
+        top_mesh = extrude_polygon(top_layer_polygon, top_height)
+        top_mesh.apply_translation([0, 0, bottom_height])
+        
+        plate = trimesh.util.concatenate([bottom_mesh, top_mesh])
+    except Exception as e:
+        print(f"Extrusion failed, creating simple plate: {e}")
+        # Ultimate fallback: just create a simple box
+        plate = trimesh.creation.box(extents=(settings.card_width, settings.card_height, settings.card_thickness))
+        plate.apply_translation((settings.card_width/2, settings.card_height/2, settings.card_thickness/2))
 
     # Center at origin
-    plate.apply_translation(-plate.bounds[0])
-    plate.apply_translation(-plate.centroid)
+    try:
+        plate.apply_translation(-plate.bounds[0])
+        plate.apply_translation(-plate.centroid)
+    except:
+        pass  # If centering fails, just return the plate as is
 
     return plate
 
@@ -386,6 +425,7 @@ def generate_braille_stl():
     data = request.get_json()
     lines = data.get('lines', ['', '', '', ''])
     plate_type = data.get('plate_type', 'positive')
+    grade = data.get('grade', 'g1')
     settings_data = data.get('settings', {})
     
     # Validate input
@@ -406,7 +446,7 @@ def generate_braille_stl():
     
     try:
         if plate_type == 'positive':
-            mesh = create_positive_plate_mesh(lines, "g1", settings)
+            mesh = create_positive_plate_mesh(lines, grade, settings)
         else:
             mesh = create_negative_plate_mesh(settings)
         

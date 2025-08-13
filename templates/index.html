@@ -245,31 +245,45 @@
             <button id="download-btn">Download STL</button>
         </div>
         <div class="form-section">
-            <h1>Braille Business Card STL Generator</h1>
+            <h1>English to Braille STL Generator</h1>
             
             <div class="info-panel">
                 <p><strong>For Business Cards:</strong> 3.5 in × 2 in</p>
-                <p><strong>Up to 4 braille lines</strong> (You will be alerted if a line exceeds capacity.)</p>
+                <p><strong>Enter English text in up to 4 lines</strong> (The program will automatically translate to braille)</p>
             </div>
             
             <form id="braille-form">
                 <div class="line-input-group">
-                    <label class="grade-label">Pre-Translated Braille (See instructions for details)</label>
+                    <label class="grade-label">Enter English Text (Will be automatically translated to braille)</label>
                     <div class="line-input">
                         <span class="line-label">Line 1</span>
-                        <input type="text" id="line1" name="line1" placeholder="Paste your pre-translated Braille characters here." maxlength="50">
+                        <input type="text" id="line1" name="line1" placeholder="Enter English text here..." maxlength="50">
                     </div>
                     <div class="line-input">
                         <span class="line-label">Line 2</span>
-                        <input type="text" id="line2" name="line2" placeholder="Paste your pre-translated Braille characters here." maxlength="50">
+                        <input type="text" id="line2" name="line2" placeholder="Enter English text here..." maxlength="50">
                     </div>
                     <div class="line-input">
                         <span class="line-label">Line 3</span>
-                        <input type="text" id="line3" name="line3" placeholder="Paste your pre-translated Braille characters here." maxlength="50">
+                        <input type="text" id="line3" name="line3" placeholder="Enter English text here..." maxlength="50">
                     </div>
                     <div class="line-input">
                         <span class="line-label">Line 4</span>
-                        <input type="text" id="line4" name="line4" placeholder="Paste your pre-translated Braille characters here." maxlength="50">
+                        <input type="text" id="line4" name="line4" placeholder="Enter English text here..." maxlength="50">
+                    </div>
+                </div>
+
+                <div class="grade-selection">
+                    <label class="grade-label">Braille Grade (Select translation level)</label>
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="grade" value="g1" checked>
+                            <span class="radio-text">Grade 1 (Uncontracted - Each letter is spelled out)</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="grade" value="g2">
+                            <span class="radio-text">Grade 2 (Contracted - Uses abbreviations and contractions)</span>
+                        </label>
                     </div>
                 </div>
 
@@ -407,6 +421,7 @@
             ];
             
             const plateType = document.querySelector('input[name="plate_type"]:checked').value;
+            const grade = document.querySelector('input[name="grade"]:checked').value;
             const settings = {
                 grid_columns: document.getElementById('grid_columns').value,
                 grid_rows: document.getElementById('grid_rows').value,
@@ -429,7 +444,7 @@
             const res = await fetch('/generate_braille_stl', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lines: lines, grade: 'g1', plate_type: plateType, settings: settings })
+                body: JSON.stringify({ lines: lines, grade: grade, plate_type: plateType, settings: settings })
             });
             
             if (!res.ok) {
