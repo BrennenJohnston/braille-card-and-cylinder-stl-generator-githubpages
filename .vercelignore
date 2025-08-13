@@ -7,6 +7,11 @@ third_party/liblouis/include/
 third_party/liblouis/share/info/
 *.pc
 
+# Keep these for backend liblouis
+!third_party/liblouis/bin/lou_translate
+!third_party/liblouis/bin/lou_translate.exe
+!third_party/liblouis/tables/
+
 # Keep these liblouis files for web worker
 !node_modules/liblouis-build/
 !node_modules/liblouis/
