@@ -1,0 +1,46 @@
+# Git files
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation
+README.md
+PACKAGING_GUIDE.md
+STANDALONE_README.md
+
+# Development files
+desktop_app.py
+launcher.py
+build_standalone.py
+setup_cx_freeze.py
+install_standalone.bat
