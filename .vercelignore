@@ -1,9 +1,10 @@
-# Exclude heavy liblouis files from Vercel deployment (but keep node_modules liblouis)
-third_party/liblouis/
-*.dll
-*.exe
-*.a
-*.la
+# Exclude heavy liblouis files from Vercel deployment (but keep essential ones)
+third_party/liblouis/bin/*.dll
+third_party/liblouis/bin/*.a
+third_party/liblouis/bin/*.la
+third_party/liblouis/lib/
+third_party/liblouis/include/
+third_party/liblouis/share/info/
 *.pc
 
 # Keep these liblouis files for web worker
