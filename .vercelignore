@@ -1,8 +1,22 @@
-# Git files
-.git
-.gitignore
+# Exclude heavy liblouis files from Vercel deployment
+third_party/liblouis/
+*.dll
+*.exe
+*.a
+*.la
+*.pc
 
-# Python cache
+# Git and development files
+.git/
+.gitignore
+README.md
+*.md
+.env
+.venv/
+venv/
+env/
+
+# Python cache and temporary files
 __pycache__/
 *.pyc
 *.pyo
@@ -10,37 +24,43 @@ __pycache__/
 .Python
 *.so
 
-# Virtual environment
-.venv/
-venv/
-env/
-
-# IDE files
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS files
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Logs
+# Logs and temporary files
 *.log
-
-# Temporary files
+*.tmp
+*.temp
 tmp/
 temp/
-*.tmp
 
-# Documentation
-README.md
-PACKAGING_GUIDE.md
-STANDALONE_README.md
-
-# Development files
+# Development scripts
+build_standalone.py
 desktop_app.py
 launcher.py
-build_standalone.py
 setup_cx_freeze.py
 install_standalone.bat
+
+# Documentation
+PACKAGING_GUIDE.md
+STANDALONE_README.md
+VERCEL_DEPLOYMENT.md
+VERCEL_DEPLOYMENT_STRATEGY.md
+VERCEL_JS_LOUIS_DEPLOYMENT.md
+
+# Test files
+test_output.txt
+tmp_index_commit.html
