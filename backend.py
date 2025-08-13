@@ -425,7 +425,7 @@ def generate_braille_stl():
     data = request.get_json()
     lines = data.get('lines', ['', '', '', ''])
     plate_type = data.get('plate_type', 'positive')
-    grade = data.get('grade', 'g1')
+    grade = data.get('grade', 'g2')
     settings_data = data.get('settings', {})
     
     # Validate input
