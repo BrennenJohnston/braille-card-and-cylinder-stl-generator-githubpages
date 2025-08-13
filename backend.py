@@ -459,4 +459,4 @@ def generate_counter_plate_stl():
         return jsonify({'error': f'Failed to generate counter plate STL: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5002) 
+    app.run(debug=True, port=5001) 
