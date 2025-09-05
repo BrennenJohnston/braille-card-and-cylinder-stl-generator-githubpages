@@ -1,76 +1,23 @@
-# Exclude heavy liblouis files from Vercel deployment (but keep essential ones)
-third_party/liblouis/bin/*.dll
-third_party/liblouis/bin/*.a
-third_party/liblouis/bin/*.la
-third_party/liblouis/lib/
-third_party/liblouis/include/
-third_party/liblouis/share/info/
-*.pc
-
-# Backend now uses JavaScript liblouis (no executables needed)
-# third_party/liblouis/ is no longer required
-
-# Keep these liblouis files for web worker
-!node_modules/liblouis-build/
-!node_modules/liblouis/
-!static/liblouis-worker.js
-!static/liblouis/
-
-# Git and development files
-.git/
-.gitignore
-README.md
-*.md
-.env
-.venv/
-venv/
-env/
-
-# Python cache and temporary files
+# Python caches and build artifacts
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs and temporary files
+*.py[cod]
 *.log
-*.tmp
-*.temp
-tmp/
-temp/
+build/
+dist/
+*.spec
 
-# Development scripts
+# Local packaging/build scripts
 build_standalone.py
-desktop_app.py
-launcher.py
 setup_cx_freeze.py
 install_standalone.bat
-
-# Documentation
 PACKAGING_GUIDE.md
 STANDALONE_README.md
-VERCEL_DEPLOYMENT.md
-VERCEL_DEPLOYMENT_STRATEGY.md
-VERCEL_JS_LOUIS_DEPLOYMENT.md
+Procfile
 
-# Test files
-test_output.txt
-tmp_index_commit.html
+# Heavy/duplicate assets not needed on Vercel
+third_party/
+node_modules/
+
+# Test artifacts
+*.stl
+*.txt
