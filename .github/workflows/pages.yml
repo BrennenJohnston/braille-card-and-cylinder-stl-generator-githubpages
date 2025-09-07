@@ -2,7 +2,7 @@ name: Deploy static site to GitHub Pages
 
 on:
   push:
-    branches: [ "main", "brennen-dev" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 permissions:
@@ -23,6 +23,8 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Build static bundle
         shell: bash
