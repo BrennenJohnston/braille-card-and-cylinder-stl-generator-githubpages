@@ -1774,17 +1774,17 @@
 
     
     <!-- Load the real liblouis JavaScript implementation from static files -->
-    <script src="./static/liblouis/build-no-tables-utf16.js"></script>
-    <script src="./static/liblouis/easy-api.js"></script>
+    <script src="../static/liblouis/build-no-tables-utf16.js"></script>
+    <script src="../static/liblouis/easy-api.js"></script>
     <!-- Runtime config for GitHub Pages / external backend -->
-    <script src="./static/app-config.js"></script>
+    <script src="../static/app-config.js"></script>
     
     <script type="module">
-        import * as THREE from './static/three.module.js';
-        import { STLLoader } from './static/STLLoader.js';
-        import { OrbitControls } from './static/OrbitControls.js';
-        import { buildCardEmbossingPlate, buildCylinderEmbossingPlate } from './static/geometry.js';
-        import { exportObjectToAsciiSTL } from './static/export-stl.js';
+        import * as THREE from '../static/three.module.js';
+        import { STLLoader } from '../static/STLLoader.js';
+        import { OrbitControls } from '../static/OrbitControls.js';
+        import { buildCardEmbossingPlate, buildCylinderEmbossingPlate } from '../static/geometry.js';
+        import { exportObjectToAsciiSTL } from '../static/export-stl.js';
         const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || '';
         async function loadLanguageOptions() {
             const select = document.getElementById('language-table');
@@ -1804,7 +1804,7 @@
             // Try static manifest first to avoid backend dependency
             let data = null;
             try {
-                const resp = await fetch('./static/tables-manifest.json');
+                const resp = await fetch('../static/tables-manifest.json');
                 if (resp.ok) {
                     data = await resp.json();
                 }
@@ -3251,7 +3251,7 @@
                 
                 // Test if worker file is accessible first
                 try {
-                    const workerResponse = await fetch('./static/liblouis-worker.js');
+                    const workerResponse = await fetch('../static/liblouis-worker.js');
                     if (!workerResponse.ok) {
                         throw new Error(`Worker file not accessible: ${workerResponse.status}`);
                     }
@@ -3261,7 +3261,7 @@
                     throw new Error('Cannot access worker file: ' + fetchError.message);
                 }
                 
-                liblouisWorker = new Worker('./static/liblouis-worker.js');
+                liblouisWorker = new Worker('../static/liblouis-worker.js');
                 
                 // Handle worker messages
                 liblouisWorker.onmessage = function(e) {
