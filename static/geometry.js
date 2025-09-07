@@ -2,6 +2,7 @@
 // Uses three.js primitives to construct positive embossing plates for card and cylinder
 
 import * as THREE from './three.module.js';
+import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg';
 // Note: Removed external CSG dependency for maximum compatibility on static hosting (GitHub Pages).
 // All geometry is now built using native THREE primitives only.
 
@@ -201,18 +202,20 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
 export function buildCardCounterPlate(settings) {
     const material = new THREE.MeshBasicMaterial();
 
-    const baseGeom = createBasePlateGeometry(settings);
-    const baseMeshPre = new THREE.Mesh(baseGeom, material);
-    baseMeshPre.position.set(
+    // Base plate brush
+    const baseGeometry = createBasePlateGeometry(settings);
+    const baseBrush = new Brush(baseGeometry, material);
+    baseBrush.position.set(
         toNumber(settings.card_width, 86) / 2,
         toNumber(settings.card_height, 54) / 2,
         toNumber(settings.card_thickness, 1.6) / 2
     );
+    baseBrush.updateMatrixWorld(true);
 
+    // Dot layout parameters
     const dotSpacing = toNumber(settings.dot_spacing, 2.54);
     const dotColOffsets = [-dotSpacing / 2, dotSpacing / 2];
     const dotRowOffsets = [dotSpacing, 0, -dotSpacing];
-
     const leftMargin = toNumber(settings.left_margin, 8);
     const topMargin = toNumber(settings.top_margin, 8);
     const cellSpacing = toNumber(settings.cell_spacing, 6.0);
@@ -222,11 +225,59 @@ export function buildCardCounterPlate(settings) {
     const gridRows = getGridRows(settings);
     const totalColumns = Number(settings.grid_columns || settings.gridColumns || 14);
 
-    // Without CSG, return a plain base plate as the counter plate approximation.
-    const finalMesh = baseMeshPre;
-    const group = new THREE.Group();
-    group.add(finalMesh);
-    return group;
+    // Sphere radius for recess (slightly oversized via offset if provided)
+    const baseDiameter = toNumber(settings.emboss_dot_base_diameter, 1.5);
+    const counterOffset = toNumber(settings.counter_plate_dot_size_offset, 0.0);
+    const sphereRadius = Math.max(0.01, (baseDiameter + counterOffset) / 2);
+    const sphereSegmentsW = 16;
+    const sphereSegmentsH = 12;
+
+    // Sphere placed with center on the top surface (z = thickness) creates a hemispherical recess
+    const plateThickness = toNumber(settings.card_thickness, 1.6);
+
+    // Build all recess brushes
+    const recessBrushes = [];
+    for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
+        const yCellCenter = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust;
+
+        for (let col = 0; col < totalColumns; col++) {
+            const xCellCenter = leftMargin + ((col + 1) * cellSpacing) + xAdjust;
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 2; c++) {
+                    const x = xCellCenter + dotColOffsets[c];
+                    const y = yCellCenter + dotRowOffsets[r];
+                    const z = plateThickness - 1e-3; // slight inward bias for robust CSG
+
+                    const sphereGeometry = new THREE.SphereGeometry(sphereRadius, sphereSegmentsW, sphereSegmentsH);
+                    const sphereBrush = new Brush(sphereGeometry, material);
+                    sphereBrush.position.set(x, y, z);
+                    sphereBrush.updateMatrixWorld(true);
+                    recessBrushes.push(sphereBrush);
+                }
+            }
+        }
+    }
+
+    const evaluator = new Evaluator();
+
+    // Union all spheres into one brush to perform a single subtraction
+    let unionBrush = recessBrushes.length > 0 ? recessBrushes[0] : null;
+    for (let i = 1; i < recessBrushes.length; i++) {
+        unionBrush = evaluator.evaluate(unionBrush, recessBrushes[i], ADDITION);
+    }
+
+    // If there are no recesses (edge case), just return the base
+    if (!unionBrush) {
+        const fallbackGroup = new THREE.Group();
+        fallbackGroup.add(baseBrush);
+        return fallbackGroup;
+    }
+
+    const resultBrush = evaluator.evaluate(baseBrush, unionBrush, SUBTRACTION);
+    // Return as a group for consistency with callers
+    const resultGroup = new THREE.Group();
+    resultGroup.add(resultBrush);
+    return resultGroup;
 }
 
 // Counter plate (cylinder): subtract hemispherical recesses and optional 12-gon cutout
@@ -236,20 +287,20 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const diameter = toNumber(cylinderParams.diameter_mm, 31.35);
     const height = toNumber(cylinderParams.height_mm, toNumber(settings.card_height, 54));
     const seamOffsetDeg = toNumber(cylinderParams.seam_offset_deg, 355);
-    const cutoutInscribed = toNumber(cylinderParams.polygonal_cutout_radius_mm, 0);
     const radius = diameter / 2;
 
-    // Start from cylinder shell
-    let cylGeom = new THREE.CylinderGeometry(radius, radius, height, 96, 1, false);
-    cylGeom.rotateX(Math.PI / 2);
+    // Base cylinder brush (axis along Z)
+    let cylGeometry = new THREE.CylinderGeometry(radius, radius, height, 96, 1, false);
+    cylGeometry.rotateX(Math.PI / 2);
+    const baseBrush = new Brush(cylGeometry, material);
+    baseBrush.updateMatrixWorld(true);
 
-    // Polygonal cutout removed (no CSG). Use plain cylinder.
-
-    // Prepare to subtract hemispherical recesses from the cylinder surface
+    // Recess parameters
     const baseDiameter = toNumber(settings.emboss_dot_base_diameter, 1.5);
     const counterOffset = toNumber(settings.counter_plate_dot_size_offset, 0.0);
-    const r = Math.max(0.01, (baseDiameter + counterOffset) / 2);
-    const sphereGeom = new THREE.SphereGeometry(r, 16, 12);
+    const sphereRadius = Math.max(0.01, (baseDiameter + counterOffset) / 2);
+    const sphereSegmentsW = 16;
+    const sphereSegmentsH = 12;
 
     const dotSpacing = toNumber(settings.dot_spacing, 2.54);
     const dotColAngleOffsets = [-(dotSpacing / radius) / 2, (dotSpacing / radius) / 2];
@@ -265,11 +316,55 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
 
     const circumference = Math.PI * diameter;
     const thetaOffset = seamOffsetDeg * Math.PI / 180;
-    const centerRadialDistance = radius - r + 1e-3; // recess into the surface
 
-    // Without CSG, return a plain cylinder as the counter plate approximation.
-    const finalMesh = new THREE.Mesh(cylGeom, material);
-    const group = new THREE.Group();
-    group.add(finalMesh);
-    return group;
+    // Build all recess brushes positioned on cylinder surface (slightly inside for robust subtraction)
+    const recessBrushes = [];
+    const zCenterOffset = -height / 2;
+    for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
+        const yLocal = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust;
+
+        for (let col = 0; col < totalColumns; col++) {
+            const xCell = leftMargin + ((col + 1) * cellSpacing) + xAdjust;
+            const baseTheta = (xCell / circumference) * Math.PI * 2 + thetaOffset;
+
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 2; c++) {
+                    const theta = baseTheta + dotColAngleOffsets[c];
+                    const radialDir = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
+                    const centerRadialDistance = radius - 1e-3; // center just inside the surface
+
+                    const xWorld = radialDir.x * centerRadialDistance;
+                    const yWorld = radialDir.y * centerRadialDistance;
+                    const zWorld = (yLocal + dotRowOffsets[r] + zCenterOffset);
+
+                    const sphereGeometry = new THREE.SphereGeometry(sphereRadius, sphereSegmentsW, sphereSegmentsH);
+                    const sphereBrush = new Brush(sphereGeometry, material);
+                    sphereBrush.position.set(xWorld, yWorld, zWorld);
+
+                    // Align sphere so its local +Z points along the outward radial direction (optional but keeps transforms consistent)
+                    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), radialDir);
+                    sphereBrush.setRotationFromQuaternion(q);
+                    sphereBrush.updateMatrixWorld(true);
+                    recessBrushes.push(sphereBrush);
+                }
+            }
+        }
+    }
+
+    const evaluator = new Evaluator();
+    let unionBrush = recessBrushes.length > 0 ? recessBrushes[0] : null;
+    for (let i = 1; i < recessBrushes.length; i++) {
+        unionBrush = evaluator.evaluate(unionBrush, recessBrushes[i], ADDITION);
+    }
+
+    if (!unionBrush) {
+        const fallbackGroup = new THREE.Group();
+        fallbackGroup.add(baseBrush);
+        return fallbackGroup;
+    }
+
+    const resultBrush = evaluator.evaluate(baseBrush, unionBrush, SUBTRACTION);
+    const resultGroup = new THREE.Group();
+    resultGroup.add(resultBrush);
+    return resultGroup;
 }
