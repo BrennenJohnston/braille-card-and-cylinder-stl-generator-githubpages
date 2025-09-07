@@ -3016,7 +3016,7 @@
                 // Client-side STL generation using OpenJSCAD in a module worker; fallback to Three.js on error
                 let stlBlob;
                 try {
-                    const workerUrl = new URL('../static/jscad-worker.js', import.meta.url);
+                    const workerUrl = new URL('static/jscad-worker.js', document.baseURI);
                     const jscadWorker = new Worker(workerUrl.href, { type: 'module' });
                     const reqId = Math.random().toString(36).slice(2);
                     const msg = { id: reqId, type: 'generate', data: { plateType, shapeType, settings, cylinderParams, translatedLines } };
@@ -3310,7 +3310,7 @@
                 
                 // Test if worker file is accessible first (using resolved URL)
                 try {
-                    const workerResponse = await fetch(workerUrl.href);
+                    const workerResponse = await fetch(workerUrl.href, { cache: 'no-store' });
                     if (!workerResponse.ok) {
                         throw new Error(`Worker file not accessible: ${workerResponse.status}`);
                     }
