@@ -9,11 +9,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Braille Plate & Cylinder STL Generator</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="icon" href="../static/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="./static/favicon.svg" type="image/svg+xml">
+    <base href="/braille-card-and-cylinder-stl-generator-githubpages/">
     <script type="importmap">
         {
             "imports": {
-                "three": "../static/three.module.js",
+                "three": "static/three.module.js",
                 "three-mesh-bvh": "https://unpkg.com/three-mesh-bvh@0.7.6?module",
                 "three-bvh-csg": "https://unpkg.com/three-bvh-csg@0.0.17?module"
             }
@@ -1784,17 +1785,17 @@
 
     
     <!-- Load the real liblouis JavaScript implementation from static files -->
-    <script src="../static/liblouis/build-no-tables-utf16.js"></script>
-    <script src="../static/liblouis/easy-api.js"></script>
+    <script src="static/liblouis/build-no-tables-utf16.js"></script>
+    <script src="static/liblouis/easy-api.js"></script>
     <!-- Runtime config for GitHub Pages / external backend -->
-    <script src="../static/app-config.js"></script>
+    <script src="static/app-config.js"></script>
     
     <script type="module">
-        import * as THREE from '../static/three.module.js';
-        import { STLLoader } from '../static/STLLoader.js';
-        import { OrbitControls } from '../static/OrbitControls.js';
-        import { buildCardEmbossingPlate, buildCylinderEmbossingPlate, buildCardCounterPlate, buildCylinderCounterPlate } from '../static/geometry.js';
-        import { exportObjectToAsciiSTL } from '../static/export-stl.js';
+        import * as THREE from 'three';
+        import { STLLoader } from './static/STLLoader.js';
+        import { OrbitControls } from './static/OrbitControls.js';
+        import { buildCardEmbossingPlate, buildCylinderEmbossingPlate, buildCardCounterPlate, buildCylinderCounterPlate } from './static/geometry.js';
+        import { exportObjectToAsciiSTL } from './static/export-stl.js';
         // Static GH Pages deployment: disable backend completely
         const API_BASE = '';
         const backendAvailable = false;
