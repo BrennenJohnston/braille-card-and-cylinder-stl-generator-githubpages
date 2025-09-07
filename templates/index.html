@@ -2076,6 +2076,7 @@
         const log = {
             debug: isProduction ? () => {} : console.log,
             info: isProduction ? () => {} : console.log,
+            warn: isProduction ? () => {} : console.warn,
             error: console.error // Always log errors
         };
 
@@ -2144,7 +2145,7 @@
 
         // Function to update 3D scene colors when theme changes
         function update3DSceneColors() {
-            if (typeof scene !== 'undefined' && scene && typeof renderer !== 'undefined' && renderer) {
+            if (scene && renderer && camera) {
                 const styles = getComputedStyle(document.documentElement);
                 const stlBackground = styles.getPropertyValue('--stl-background').trim() || '#f1f5f9';
                 const stlAmbientLight = styles.getPropertyValue('--stl-ambient-light').trim() || '#888888';
@@ -2509,7 +2510,14 @@
                 return;
             }
             const shapeType = shapeTypeElement.value;
-            const cylinderSettings = document.querySelector('.grade-selection:has(#cylinder_diameter_mm)');
+            // Avoid :has() selector for broader browser support
+            const cylinderSettings = (function() {
+                const sections = document.querySelectorAll('.grade-selection');
+                for (const section of sections) {
+                    if (section.querySelector('#cylinder_diameter_mm')) return section;
+                }
+                return null;
+            })();
             
             // Always show cylinder dimensions in expert mode
             if (cylinderSettings) {
