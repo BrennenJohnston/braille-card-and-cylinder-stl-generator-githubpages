@@ -1807,7 +1807,8 @@
             // Load static manifest only
             let staticData = null;
             try {
-                const resp = await fetch('../static/tables-manifest.json', { cache: 'no-store' });
+                const tablesManifestUrl = new URL('../static/tables-manifest.json', import.meta.url);
+                const resp = await fetch(tablesManifestUrl.href, { cache: 'no-store' });
                 if (resp.ok) {
                     staticData = await resp.json();
                 }
@@ -3270,9 +3271,12 @@
                 // Initialize liblouis web worker
                 log.debug('Initializing liblouis web worker...');
                 
-                // Test if worker file is accessible first
+                // Resolve worker URL relative to this module for GitHub Pages base paths
+                const workerUrl = new URL('../static/liblouis-worker.js', import.meta.url);
+                
+                // Test if worker file is accessible first (using resolved URL)
                 try {
-                    const workerResponse = await fetch('../static/liblouis-worker.js');
+                    const workerResponse = await fetch(workerUrl.href);
                     if (!workerResponse.ok) {
                         throw new Error(`Worker file not accessible: ${workerResponse.status}`);
                     }
@@ -3282,7 +3286,8 @@
                     throw new Error('Cannot access worker file: ' + fetchError.message);
                 }
                 
-                liblouisWorker = new Worker('../static/liblouis-worker.js');
+                // Create the worker from the resolved URL
+                liblouisWorker = new Worker(workerUrl.href);
                 
                 // Handle worker messages
                 liblouisWorker.onmessage = function(e) {
