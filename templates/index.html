@@ -11,10 +11,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <link rel="icon" href="./static/favicon.svg" type="image/svg+xml">
     <base href="/braille-card-and-cylinder-stl-generator-githubpages/">
+    <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
     <script type="importmap">
         {
             "imports": {
-                "three": "static/three.module.js",
+                "three": "./static/three.module.js",
                 "three-mesh-bvh": "https://unpkg.com/three-mesh-bvh@0.7.6?module",
                 "three-bvh-csg": "https://unpkg.com/three-bvh-csg@0.0.17?module"
             }
@@ -3012,22 +3013,45 @@
             log.debug('Cylinder Params:', cylinderParams);
             
             try {
-                // Client-side STL generation only
-                let object3D;
-                if (plateType === 'positive') {
-                    if (shapeType === 'cylinder') {
-                        object3D = buildCylinderEmbossingPlate(translatedLines, settings, cylinderParams);
+                // Client-side STL generation using OpenJSCAD in a module worker; fallback to Three.js on error
+                let stlBlob;
+                try {
+                    const workerUrl = new URL('../static/jscad-worker.js', import.meta.url);
+                    const jscadWorker = new Worker(workerUrl.href, { type: 'module' });
+                    const reqId = Math.random().toString(36).slice(2);
+                    const msg = { id: reqId, type: 'generate', data: { plateType, shapeType, settings, cylinderParams, translatedLines } };
+                    const stlText = await new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('JSCAD worker timeout')), 20000);
+                        jscadWorker.onmessage = (e) => {
+                            const { id, type, result } = e.data || {};
+                            if (id !== reqId || type !== 'generate') return;
+                            clearTimeout(timer);
+                            jscadWorker.terminate();
+                            if (result && result.success) resolve(result.stlText);
+                            else reject(new Error(result && result.error ? result.error : 'Unknown worker error'));
+                        };
+                        jscadWorker.onerror = (err) => { clearTimeout(timer); jscadWorker.terminate(); reject(err.message || String(err)); };
+                        jscadWorker.postMessage(msg);
+                    });
+                    stlBlob = new Blob([stlText], { type: 'model/stl' });
+                } catch (workerErr) {
+                    log.error('JSCAD worker failed, falling back to Three.js STL generation:', workerErr);
+                    let object3D;
+                    if (plateType === 'positive') {
+                        if (shapeType === 'cylinder') {
+                            object3D = buildCylinderEmbossingPlate(translatedLines, settings, cylinderParams);
+                        } else {
+                            object3D = buildCardEmbossingPlate(translatedLines, settings);
+                        }
                     } else {
-                        object3D = buildCardEmbossingPlate(translatedLines, settings);
+                        if (shapeType === 'cylinder') {
+                            object3D = buildCylinderCounterPlate(settings, cylinderParams);
+                        } else {
+                            object3D = buildCardCounterPlate(settings);
+                        }
                     }
-                } else {
-                    if (shapeType === 'cylinder') {
-                        object3D = buildCylinderCounterPlate(settings, cylinderParams);
-                    } else {
-                        object3D = buildCardCounterPlate(settings);
-                    }
+                    stlBlob = exportObjectToAsciiSTL(object3D, `braille_${plateType}_${shapeType}`);
                 }
-                const stlBlob = exportObjectToAsciiSTL(object3D, `braille_${plateType}_${shapeType}`);
                 if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
                 lastSTLUrl = URL.createObjectURL(stlBlob);
                 
