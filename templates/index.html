@@ -1786,6 +1786,18 @@
         import { buildCardEmbossingPlate, buildCylinderEmbossingPlate } from '../static/geometry.js';
         import { exportObjectToAsciiSTL } from '../static/export-stl.js';
         const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || '';
+        let backendAvailable = false;
+        async function detectBackend() {
+            const base = API_BASE || '';
+            try {
+                const resp = await fetch(`${base}/health?noCache=${Date.now()}`, { cache: 'no-store' });
+                backendAvailable = !!resp && resp.ok;
+                log.debug('Backend availability:', backendAvailable);
+            } catch (e) {
+                backendAvailable = false;
+                log.debug('Backend not available:', e);
+            }
+        }
         async function loadLanguageOptions() {
             const select = document.getElementById('language-table');
             if (!select) return;
@@ -1801,30 +1813,56 @@
             defaultOptions.forEach(o => defaultGroup.appendChild(o));
             select.appendChild(defaultGroup);
 
-            // Try static manifest first to avoid backend dependency
-            let data = null;
+            // Load both static manifest and backend list (merge when possible)
+            let staticData = null;
+            let backendData = null;
             try {
-                const resp = await fetch('../static/tables-manifest.json');
+                const resp = await fetch('../static/tables-manifest.json', { cache: 'no-store' });
                 if (resp.ok) {
-                    data = await resp.json();
+                    staticData = await resp.json();
                 }
             } catch (e) { /* ignore */ }
-            // Fallback to backend if available
-            if (!data) {
-                try {
-                    const resp2 = await fetch(`${API_BASE}/liblouis/tables`, { credentials: 'same-origin' });
-                    if (resp2.ok) data = await resp2.json().catch(() => null);
-                } catch (e) { /* ignore */ }
+            try {
+                const resp2 = await fetch(`${API_BASE}/liblouis/tables?noCache=${Date.now()}`, { credentials: 'same-origin' });
+                if (resp2.ok) {
+                    backendData = await resp2.json().catch(() => null);
+                }
+            } catch (e) { /* ignore */ }
+
+            // Merge unique entries by file name, prefer backend metadata when available
+            const merged = { tables: [] };
+            const seenFiles = new Set(defaultValues);
+            const pushUnique = (t) => {
+                if (!t || !t.file || seenFiles.has(t.file)) return;
+                merged.tables.push(t);
+                seenFiles.add(t.file);
+            };
+            if (staticData && Array.isArray(staticData.tables)) {
+                staticData.tables.forEach(pushUnique);
             }
-            
-            if (!data || !Array.isArray(data.tables)) return;
+            if (backendData && Array.isArray(backendData.tables)) {
+                // Prefer backend info by replacing same-file static entries
+                const byFile = new Map(merged.tables.map(t => [t.file, t]));
+                backendData.tables.forEach(t => {
+                    if (!t || !t.file) return;
+                    if (byFile.has(t.file)) {
+                        byFile.set(t.file, t);
+                    } else if (!seenFiles.has(t.file)) {
+                        byFile.set(t.file, t);
+                        seenFiles.add(t.file);
+                    }
+                });
+                merged.tables = Array.from(byFile.values());
+            }
+
+            if (!merged.tables || merged.tables.length === 0) return;
 
             // Build label for each entry (native-language autonyms)
             const otherGroup = document.createElement('optgroup');
             otherGroup.label = 'Other';
 
             const seen = new Set(defaultValues);
-            const entries = data.tables.slice();
+            const entries = merged.tables.slice();
 
             // Sort: English first, then by locale and file name
             entries.sort((a, b) => {
@@ -2986,16 +3024,43 @@
             log.debug('Cylinder Params:', cylinderParams);
             
             try {
-                // Client-side STL generation (no backend)
-                let object3D;
-                if (shapeType === 'cylinder') {
-                    object3D = buildCylinderEmbossingPlate(translatedLines, settings, cylinderParams);
+                if (backendAvailable) {
+                    // Use backend to generate full-feature STL with markers and cutouts
+                    const payload = {
+                        lines: translatedLines,
+                        original_lines: lines,
+                        plate_type: plateType,
+                        grade: 'g2',
+                        settings,
+                        shape_type: shapeType,
+                        cylinder_params: cylinderParams
+                    };
+                    const endpoint = plateType === 'positive' ? `${API_BASE || ''}/generate_braille_stl` : `${API_BASE || ''}/generate_counter_plate_stl`;
+                    const resp = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!resp.ok) {
+                        const maybeJson = await resp.clone().json().catch(() => null);
+                        const msg = (maybeJson && (maybeJson.error || maybeJson.message)) || `HTTP ${resp.status}`;
+                        throw new Error(`Backend generation failed: ${msg}`);
+                    }
+                    const stlBlob = await resp.blob();
+                    if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
+                    lastSTLUrl = URL.createObjectURL(stlBlob);
                 } else {
-                    object3D = buildCardEmbossingPlate(translatedLines, settings);
+                    // Client-side STL generation (fallback)
+                    let object3D;
+                    if (shapeType === 'cylinder') {
+                        object3D = buildCylinderEmbossingPlate(translatedLines, settings, cylinderParams);
+                    } else {
+                        object3D = buildCardEmbossingPlate(translatedLines, settings);
+                    }
+                    const stlBlob = exportObjectToAsciiSTL(object3D, `braille_${plateType}_${shapeType}`);
+                    if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
+                    lastSTLUrl = URL.createObjectURL(stlBlob);
                 }
-                const stlBlob = exportObjectToAsciiSTL(object3D, `braille_${plateType}_${shapeType}`);
-                if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
-                lastSTLUrl = URL.createObjectURL(stlBlob);
                 
                 // Generate filename on frontend to match backend logic
                 let filename = plateType === 'positive' ? 'braille_embossing_plate' : 'braille_counter_plate';
@@ -3330,6 +3395,8 @@
                 log.warn('Could not restore shape type from localStorage:', e);
             }
             
+            // Detect backend availability in parallel with scene init
+            detectBackend();
             init3D();
             animate();
         });
