@@ -148,8 +148,35 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
     const cylGeomY = new THREE.CylinderGeometry(radius, radius, height, 96, 1, false);
     cylGeomY.rotateX(Math.PI / 2);
 
-    // Optional polygonal cutout removed (CSG dependency). Build plain cylinder shell.
-    const finalCylGeom = cylGeomY;
+    // Optional polygonal cutout: create an extruded 12-gon shaft and subtract via CSG if radius provided
+    let finalCylGeom = cylGeomY;
+    const cutoutRadius = Math.max(0, cutoutInscribed);
+    if (cutoutRadius > 0) {
+        // Build 2D 12-gon in XY plane, then extrude along Z to cylinder height
+        const sides = 12;
+        const shape2d = new THREE.Shape();
+        for (let i = 0; i < sides; i++) {
+            const theta = (i / sides) * Math.PI * 2;
+            const x = Math.cos(theta) * cutoutRadius;
+            const y = Math.sin(theta) * cutoutRadius;
+            if (i === 0) shape2d.moveTo(x, y); else shape2d.lineTo(x, y);
+        }
+        shape2d.closePath();
+        const extrudeGeom = new THREE.ExtrudeGeometry(shape2d, { depth: height + 2, bevelEnabled: false });
+        // Center along Z to match cylinder extruded along Z with rotateX(Math.PI/2)
+        extrudeGeom.translate(0, 0, - (height + 2) / 2);
+        // Rotate to align extrude depth with world Z like the cylinder
+        extrudeGeom.rotateX(Math.PI / 2);
+
+        // Use BVH CSG subtraction to create the hole
+        const cylinderBrush = new Brush(cylGeomY, material);
+        const cutoutBrush = new Brush(extrudeGeom, material);
+        cylinderBrush.updateMatrixWorld(true);
+        cutoutBrush.updateMatrixWorld(true);
+        const evaluator = new Evaluator();
+        const subtracted = evaluator.evaluate(cylinderBrush, cutoutBrush, SUBTRACTION);
+        finalCylGeom = subtracted.geometry;
+    }
     const cylMesh = new THREE.Mesh(finalCylGeom, material);
     group.add(cylMesh);
 
