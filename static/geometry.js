@@ -163,10 +163,8 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
         }
         shape2d.closePath();
         const extrudeGeom = new THREE.ExtrudeGeometry(shape2d, { depth: height + 2, bevelEnabled: false });
-        // Center along Z to match cylinder extruded along Z with rotateX(Math.PI/2)
+        // Center along Z so the cutout extrudes bottom-to-top along the cylinder axis (+Z)
         extrudeGeom.translate(0, 0, - (height + 2) / 2);
-        // Rotate to align extrude depth with world Z like the cylinder
-        extrudeGeom.rotateX(Math.PI / 2);
 
         // Use BVH CSG subtraction to create the hole
         const cylinderBrush = new Brush(cylGeomY, material);
