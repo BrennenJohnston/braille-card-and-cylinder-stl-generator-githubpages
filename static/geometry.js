@@ -3,6 +3,24 @@
 
 import * as THREE from './three.module.js';
 import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg';
+
+// Helper to union many brushes using a balanced strategy to reduce CSG complexity
+function balancedUnion(evaluator, brushes) {
+    if (!brushes || brushes.length === 0) return null;
+    let level = brushes.slice();
+    while (level.length > 1) {
+        const next = [];
+        for (let i = 0; i < level.length; i += 2) {
+            if (i + 1 < level.length) {
+                next.push(evaluator.evaluate(level[i], level[i + 1], ADDITION));
+            } else {
+                next.push(level[i]);
+            }
+        }
+        level = next;
+    }
+    return level[0];
+}
 // Note: Removed external CSG dependency for maximum compatibility on static hosting (GitHub Pages).
 // All geometry is now built using native THREE primitives only.
 
@@ -229,8 +247,8 @@ export function buildCardCounterPlate(settings) {
     const baseDiameter = toNumber(settings.emboss_dot_base_diameter, 1.5);
     const counterOffset = toNumber(settings.counter_plate_dot_size_offset, 0.0);
     const sphereRadius = Math.max(0.01, (baseDiameter + counterOffset) / 2);
-    const sphereSegmentsW = 16;
-    const sphereSegmentsH = 12;
+    const sphereSegmentsW = 12;
+    const sphereSegmentsH = 8;
 
     // Sphere placed with center on the top surface (z = thickness) creates a hemispherical recess
     const plateThickness = toNumber(settings.card_thickness, 1.6);
@@ -260,11 +278,8 @@ export function buildCardCounterPlate(settings) {
 
     const evaluator = new Evaluator();
 
-    // Union all spheres into one brush to perform a single subtraction
-    let unionBrush = recessBrushes.length > 0 ? recessBrushes[0] : null;
-    for (let i = 1; i < recessBrushes.length; i++) {
-        unionBrush = evaluator.evaluate(unionBrush, recessBrushes[i], ADDITION);
-    }
+    // Union all spheres using balanced strategy to reduce complexity
+    const unionBrush = balancedUnion(evaluator, recessBrushes);
 
     // If there are no recesses (edge case), just return the base
     if (!unionBrush) {
@@ -290,7 +305,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const radius = diameter / 2;
 
     // Base cylinder brush (axis along Z)
-    let cylGeometry = new THREE.CylinderGeometry(radius, radius, height, 96, 1, false);
+    let cylGeometry = new THREE.CylinderGeometry(radius, radius, height, 64, 1, false);
     cylGeometry.rotateX(Math.PI / 2);
     const baseBrush = new Brush(cylGeometry, material);
     baseBrush.updateMatrixWorld(true);
@@ -299,8 +314,8 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const baseDiameter = toNumber(settings.emboss_dot_base_diameter, 1.5);
     const counterOffset = toNumber(settings.counter_plate_dot_size_offset, 0.0);
     const sphereRadius = Math.max(0.01, (baseDiameter + counterOffset) / 2);
-    const sphereSegmentsW = 16;
-    const sphereSegmentsH = 12;
+    const sphereSegmentsW = 12;
+    const sphereSegmentsH = 8;
 
     const dotSpacing = toNumber(settings.dot_spacing, 2.54);
     const dotColAngleOffsets = [-(dotSpacing / radius) / 2, (dotSpacing / radius) / 2];
@@ -352,10 +367,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     }
 
     const evaluator = new Evaluator();
-    let unionBrush = recessBrushes.length > 0 ? recessBrushes[0] : null;
-    for (let i = 1; i < recessBrushes.length; i++) {
-        unionBrush = evaluator.evaluate(unionBrush, recessBrushes[i], ADDITION);
-    }
+    const unionBrush = balancedUnion(evaluator, recessBrushes);
 
     if (!unionBrush) {
         const fallbackGroup = new THREE.Group();
