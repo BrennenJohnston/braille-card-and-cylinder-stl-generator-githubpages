@@ -1823,8 +1823,8 @@
             // Load static manifest only (with robust path fallbacks for GitHub Pages)
             let staticData = null;
             const candidateUrls = [
-                new URL('../static/tables-manifest.json', import.meta.url).href,
                 new URL('./static/tables-manifest.json', import.meta.url).href,
+                new URL('../static/tables-manifest.json', import.meta.url).href,
                 `${location.origin}/braille-card-and-cylinder-stl-generator-githubpages/static/tables-manifest.json`,
                 `${location.origin}/static/tables-manifest.json`
             ];
@@ -3316,7 +3316,7 @@
                 log.debug('Initializing liblouis web worker...');
                 
                 // Construct a worker from a Blob to avoid base-path and CORS issues
-                const staticBase = new URL('../static/', import.meta.url).href;
+                const staticBase = new URL('./static/', import.meta.url).href;
                 const workerSource = `
                     let liblouisInstance = null; let liblouisReady = false;
                     try {
@@ -3326,11 +3326,11 @@
                     async function initializeLiblouis(){
                         try {
                             await new Promise(r=>setTimeout(r,50));
-                            if (typeof self.liblouisBuild !== 'undefined' && typeof self.LiblouisEasyApi !== 'undefined') {
-                                liblouisInstance = new self.LiblouisEasyApi(self.liblouisBuild);
+                            if (typeof self.LiblouisEasyApi !== 'undefined') {
+                                liblouisInstance = new self.LiblouisEasyApi();
                                 try { liblouisInstance.enableOnDemandTableLoading('${staticBase}liblouis/tables/'); } catch (_ignored) {}
                                 liblouisReady = true; return { success: true };
-                            } else { throw new Error('Liblouis scripts not loaded'); }
+                            } else { throw new Error('Liblouis Easy API not loaded'); }
                         } catch (err) { return { success: false, error: err.message }; }
                     }
                     self.onmessage = async (e)=>{
