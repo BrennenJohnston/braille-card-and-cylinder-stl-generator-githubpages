@@ -18,6 +18,11 @@
                 "three": "./static/three.module.js",
                 "three-mesh-bvh": "https://unpkg.com/three-mesh-bvh@0.7.6?module",
                 "three-bvh-csg": "https://unpkg.com/three-bvh-csg@0.0.17?module"
+            },
+            "scopes": {
+                "https://unpkg.com/": {
+                    "three": "./static/three.module.js"
+                }
             }
         }
     </script>
@@ -1815,15 +1820,20 @@
             defaultOptions.forEach(o => defaultGroup.appendChild(o));
             select.appendChild(defaultGroup);
 
-            // Load static manifest only
+            // Load static manifest only (with robust path fallbacks for GitHub Pages)
             let staticData = null;
-            try {
-                const tablesManifestUrl = new URL('../static/tables-manifest.json', import.meta.url);
-                const resp = await fetch(tablesManifestUrl.href, { cache: 'no-store' });
-                if (resp.ok) {
-                    staticData = await resp.json();
-                }
-            } catch (e) { /* ignore */ }
+            const candidateUrls = [
+                new URL('../static/tables-manifest.json', import.meta.url).href,
+                new URL('./static/tables-manifest.json', import.meta.url).href,
+                `${location.origin}/braille-card-and-cylinder-stl-generator-githubpages/static/tables-manifest.json`,
+                `${location.origin}/static/tables-manifest.json`
+            ];
+            for (const href of candidateUrls) {
+                try {
+                    const resp = await fetch(href, { cache: 'no-store' });
+                    if (resp.ok) { staticData = await resp.json(); break; }
+                } catch (_e) {}
+            }
             // Use static entries only
             const merged = { tables: [] };
             const seenFiles = new Set(defaultValues);
@@ -3316,8 +3326,8 @@
                     async function initializeLiblouis(){
                         try {
                             await new Promise(r=>setTimeout(r,50));
-                            if (typeof liblouisBuild !== 'undefined' && typeof LiblouisEasyApi !== 'undefined') {
-                                liblouisInstance = new LiblouisEasyApi(liblouisBuild);
+                            if (typeof self.liblouisBuild !== 'undefined' && typeof self.LiblouisEasyApi !== 'undefined') {
+                                liblouisInstance = new self.LiblouisEasyApi(self.liblouisBuild);
                                 try { liblouisInstance.enableOnDemandTableLoading('${staticBase}liblouis/tables/'); } catch (_ignored) {}
                                 liblouisReady = true; return { success: true };
                             } else { throw new Error('Liblouis scripts not loaded'); }
