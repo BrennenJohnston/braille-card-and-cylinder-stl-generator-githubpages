@@ -2997,6 +2997,18 @@
                 }
             }
             
+            // Get shape type and cylinder params before showing loading message
+            const shapeType = document.querySelector('input[name="shape_type"]:checked')?.value || 'card';
+            let cylinderParams = {};
+            if (shapeType === 'cylinder') {
+                cylinderParams = {
+                    diameter_mm: document.getElementById('cylinder_diameter_mm').value,
+                    height_mm: document.getElementById('cylinder_height_mm').value,
+                    polygonal_cutout_radius_mm: document.getElementById('cylinder_polygonal_cutout_radius_mm').value,
+                    seam_offset_deg: document.getElementById('seam_offset_deg').value
+                };
+            }
+
             // Show loading message / progress indicator
             errorText.textContent = shapeType === 'cylinder' ? 'Generating cylinder STL (this can take up to ~30s)...' : 'Generating STL...';
             errorDiv.style.display = 'flex';
@@ -3006,19 +3018,6 @@
             actionBtn.disabled = true;
             actionBtn.textContent = 'Generating...';
             actionBtn.style.opacity = '0.7';
-            
-            // Get shape type and cylinder params
-            const shapeType = document.querySelector('input[name="shape_type"]:checked').value;
-            let cylinderParams = {};
-            
-            if (shapeType === 'cylinder') {
-                cylinderParams = {
-                    diameter_mm: document.getElementById('cylinder_diameter_mm').value,
-                    height_mm: document.getElementById('cylinder_height_mm').value,
-                    polygonal_cutout_radius_mm: document.getElementById('cylinder_polygonal_cutout_radius_mm').value,
-                    seam_offset_deg: document.getElementById('seam_offset_deg').value
-                };
-            }
             
             // Debug: Log the settings being sent
             log.debug('Expert Mode Settings:', settings);
