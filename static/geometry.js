@@ -335,6 +335,29 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const baseBrush = new Brush(cylGeometry, material);
     baseBrush.updateMatrixWorld(true);
 
+    // Optional polygonal cutout (12-gon), subtract from base if radius provided
+    const cutoutInscribed = toNumber(cylinderParams.polygonal_cutout_radius_mm, 0);
+    const evaluator = new Evaluator();
+    let currentBaseBrush = baseBrush;
+    if (cutoutInscribed > 0) {
+        const sides = 12;
+        const shape2d = new THREE.Shape();
+        for (let i = 0; i < sides; i++) {
+            const theta = (i / sides) * Math.PI * 2;
+            const x = Math.cos(theta) * cutoutInscribed;
+            const y = Math.sin(theta) * cutoutInscribed;
+            if (i === 0) shape2d.moveTo(x, y); else shape2d.lineTo(x, y);
+        }
+        shape2d.closePath();
+        const extrudeGeom = new THREE.ExtrudeGeometry(shape2d, { depth: height + 2, bevelEnabled: false });
+        // Center along Z so the cutout extrudes bottom-to-top along the cylinder axis (+Z)
+        extrudeGeom.translate(0, 0, - (height + 2) / 2);
+
+        const cutoutBrush = new Brush(extrudeGeom, material);
+        cutoutBrush.updateMatrixWorld(true);
+        currentBaseBrush = evaluator.evaluate(currentBaseBrush, cutoutBrush, SUBTRACTION);
+    }
+
     // Recess parameters
     const baseDiameter = toNumber(settings.emboss_dot_base_diameter, 1.5);
     const counterOffset = toNumber(settings.counter_plate_dot_size_offset, 0.0);
@@ -391,16 +414,15 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
         }
     }
 
-    const evaluator = new Evaluator();
     const unionBrush = balancedUnion(evaluator, recessBrushes);
 
     if (!unionBrush) {
         const fallbackGroup = new THREE.Group();
-        fallbackGroup.add(baseBrush);
+        fallbackGroup.add(currentBaseBrush);
         return fallbackGroup;
     }
 
-    const resultBrush = evaluator.evaluate(baseBrush, unionBrush, SUBTRACTION);
+    const resultBrush = evaluator.evaluate(currentBaseBrush, unionBrush, SUBTRACTION);
     const resultGroup = new THREE.Group();
     resultGroup.add(resultBrush);
     return resultGroup;

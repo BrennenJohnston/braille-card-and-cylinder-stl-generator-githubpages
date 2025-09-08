@@ -200,6 +200,32 @@ function buildCylinderCounter(settings, cylinderParams = {}) {
 
     let base = rotateX(Math.PI / 2, cylinder({ radius, height, segments: 96 }));
 
+    // Optional polygonal cutout (12-gon) along cylinder axis
+    const cutoutInscribed = toNumber(cylinderParams.polygonal_cutout_radius_mm, 0);
+    if (cutoutInscribed > 0) {
+        // Approximate 12-gon by subtracting 12 rotated rectangles around center to carve facets
+        // Simpler alternative in JSCAD: subtract a slightly oversized cylinder scaled into a 12-gon via rotate+union of planes.
+        // Here we approximate by union of 12 thin boxes forming a star, then subtract from base.
+        const cutters = [];
+        const facetThickness = cutoutInscribed * 2 + 2; // cover full diameter + small margin
+        const boxDepth = height + 2; // ensure passes through
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            // each box is a plane approximating a side of the 12-gon
+            const box = cuboid({ size: [facetThickness, 1, boxDepth] });
+            const rot = rotateZ(angle, box);
+            cutters.push(rot);
+        }
+        // Start from a solid disc slightly larger than inscribed radius and intersect with cutters to craft a 12-gon shaft.
+        let shaft = cylinder({ radius: cutoutInscribed + 1, height: boxDepth, segments: 48 });
+        shaft = rotateX(Math.PI / 2, shaft); // align with base (already along Z after rotateX)
+        // Intersect is not imported; emulate by subtracting complement: not straightforward with current imports.
+        // Instead, subtract a scaled cylinder to achieve a round shaft if cutters are not reliable in some engines.
+        // Simpler, robust approach: subtract a cylinder with radius = cutoutInscribed, which yields round hole, acceptable fallback.
+        // If strict polygon is required, replace this with modeling.intersections and a proper 12-gon prism.
+        base = subtract(base, rotateX(Math.PI / 2, cylinder({ radius: cutoutInscribed, height: height + 2, segments: 12 })));
+    }
+
     const dotSpacing = toNumber(settings.dot_spacing, 2.54);
     const dotColAngleOffsets = [-(dotSpacing / radius) / 2, (dotSpacing / radius) / 2];
     const dotRowOffsets = [dotSpacing, 0, -dotSpacing];
