@@ -2997,8 +2997,8 @@
                 }
             }
             
-            // Show loading message
-            errorText.textContent = plateType === 'positive' ? 'Translating text to braille...' : 'Generating counter plate...';
+            // Show loading message / progress indicator
+            errorText.textContent = shapeType === 'cylinder' ? 'Generating cylinder STL (this can take up to ~30s)...' : 'Generating STL...';
             errorDiv.style.display = 'flex';
             errorDiv.className = 'error-message info';
             
@@ -3041,6 +3041,8 @@
                         object3D = buildCardCounterPlate(settings);
                     }
                 }
+                // Yield once for UI so screen readers/users see progress
+                await new Promise(r => setTimeout(r, 50));
                 const stlBlob = exportObjectToAsciiSTL(object3D, `braille_${plateType}_${shapeType}`);
                 if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
                 lastSTLUrl = URL.createObjectURL(stlBlob);

@@ -54,46 +54,51 @@ function createRectangleShape(width, height) {
 function buildCardIndicatorBrushes(settings, material) {
     const brushes = [];
 
-    const w = toNumber(settings.card_width, 86);
-    const h = toNumber(settings.card_height, 54);
     const t = toNumber(settings.card_thickness, 1.6);
     const cellSpacing = toNumber(settings.cell_spacing, 6.0);
     const leftMargin = toNumber(settings.left_margin, 8);
-    const topMargin = toNumber(settings.top_margin, 8);
+    const dotSpacing = toNumber(settings.dot_spacing, 2.54);
+    const lineSpacing = toNumber(settings.line_spacing, 10.0);
+    const xAdjust = toNumber(settings.braille_x_adjust, 0);
+    const yAdjust = toNumber(settings.braille_y_adjust, 0);
+    const availableColumns = getAvailableColumns(settings);
+    const gridRows = getGridRows(settings);
 
-    // Sizes and depth
-    const triangleSize = Math.max(2, cellSpacing * 0.9);
-    const rectWidth = Math.max(2, cellSpacing * 0.9);
-    const rectHeight = Math.max(1.5, cellSpacing * 0.6);
     const recessDepth = Math.min(0.8, Math.max(0.2, toNumber(settings.indicator_recess_depth, 0.5)));
 
-    // Triangle at top-left margin area
-    {
-        const triShape = createEquilateralTriangleShape(triangleSize);
-        const triGeom = new THREE.ExtrudeGeometry(triShape, { depth: recessDepth, bevelEnabled: false });
-        const triBrush = new Brush(triGeom, material);
-        // Place so that the extrude (0..depth) sits inside plate top surface
-        triBrush.position.set(
-            Math.max(2, leftMargin * 0.6),
-            Math.max(2, topMargin * 0.6),
-            t - recessDepth
-        );
-        triBrush.updateMatrixWorld(true);
-        brushes.push(triBrush);
-    }
+    const triangleSize = Math.max(2, cellSpacing * 0.9);
+    const rectWidth = Math.max(1.0, cellSpacing * 0.45);
+    const rectHeight = Math.max(1.5, dotSpacing * 1.6);
 
-    // Rectangle at bottom-right margin area
-    {
-        const rectShape = createRectangleShape(rectWidth, rectHeight);
-        const rectGeom = new THREE.ExtrudeGeometry(rectShape, { depth: recessDepth, bevelEnabled: false });
-        const rectBrush = new Brush(rectGeom, material);
-        rectBrush.position.set(
-            w - Math.max(2, leftMargin * 0.6),
-            h - Math.max(2, topMargin * 0.6),
-            t - recessDepth
-        );
-        rectBrush.updateMatrixWorld(true);
-        brushes.push(rectBrush);
+    const cardHeight = toNumber(settings.card_height, 54);
+    const rowsSpan = (gridRows - 1) * lineSpacing;
+    const centerY = cardHeight / 2 + yAdjust;
+
+    for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
+        const yPos = centerY + (rowsSpan / 2 - rowIdx * lineSpacing);
+
+        // Start-of-row indicator (rectangle) at reserved first cell
+        {
+            const rectShape = createRectangleShape(rectWidth, rectHeight);
+            const rectGeom = new THREE.ExtrudeGeometry(rectShape, { depth: recessDepth, bevelEnabled: false });
+            const rectBrush = new Brush(rectGeom, material);
+            const xCellStart = leftMargin + xAdjust; // reserved first cell center
+            rectBrush.position.set(xCellStart, yPos, t - recessDepth);
+            rectBrush.updateMatrixWorld(true);
+            brushes.push(rectBrush);
+        }
+
+        // End-of-row indicator (triangle) at reserved last cell, pointing right
+        {
+            const triShape = createEquilateralTriangleShape(triangleSize);
+            const triGeom = new THREE.ExtrudeGeometry(triShape, { depth: recessDepth, bevelEnabled: false });
+            triGeom.rotateZ(-Math.PI / 2); // point along +X
+            const triBrush = new Brush(triGeom, material);
+            const xCellEnd = leftMargin + ((availableColumns + 1) * cellSpacing) + xAdjust; // one cell after last text cell
+            triBrush.position.set(xCellEnd, yPos, t - recessDepth);
+            triBrush.updateMatrixWorld(true);
+            brushes.push(triBrush);
+        }
     }
 
     return brushes;
@@ -104,18 +109,24 @@ function buildCylinderIndicatorBrushes(settings, cylinderParams, material) {
 
     const diameter = toNumber(cylinderParams.diameter_mm, 31.35);
     const height = toNumber(cylinderParams.height_mm, toNumber(settings.card_height, 54));
-    const seamOffsetDeg = toNumber(cylinderParams.seam_offset_deg, 355);
     const radius = diameter / 2;
-    const topMargin = toNumber(settings.top_margin, 8);
+
     const cellSpacing = toNumber(settings.cell_spacing, 6.0);
+    const leftMargin = toNumber(settings.left_margin, 8);
+    const dotSpacing = toNumber(settings.dot_spacing, 2.54);
+    const lineSpacing = toNumber(settings.line_spacing, 10.0);
+    const xAdjust = toNumber(settings.braille_x_adjust, 0);
+    const yAdjust = toNumber(settings.braille_y_adjust, 0);
+    const availableColumns = getAvailableColumns(settings);
+    const gridRows = getGridRows(settings);
 
     const recessDepth = Math.min(0.8, Math.max(0.2, toNumber(settings.indicator_recess_depth, 0.5)));
     const triangleSize = Math.max(2, cellSpacing * 0.9);
-    const rectWidth = Math.max(2, cellSpacing * 0.9);
-    const rectHeight = Math.max(1.5, cellSpacing * 0.6);
+    const rectWidth = Math.max(1.0, cellSpacing * 0.45);
+    const rectHeight = Math.max(1.5, dotSpacing * 1.6);
 
-    const theta0 = seamOffsetDeg * Math.PI / 180;
-    const theta1 = theta0 + Math.PI; // opposite side
+    const circumference = Math.PI * diameter;
+    const thetaOffset = toNumber(cylinderParams.seam_offset_deg, 355) * Math.PI / 180;
 
     // Helper to orient a brush so local +Z points along given radial direction
     function orientRadial(brush, theta, zWorld, radialDistance) {
@@ -128,24 +139,37 @@ function buildCylinderIndicatorBrushes(settings, cylinderParams, material) {
         brush.updateMatrixWorld(true);
     }
 
-    // Triangle near top at seam
-    {
-        const triShape = createEquilateralTriangleShape(triangleSize);
-        const triGeom = new THREE.ExtrudeGeometry(triShape, { depth: recessDepth, bevelEnabled: false });
-        const triBrush = new Brush(triGeom, material);
-        const zTop = (height / 2) - Math.max(2, topMargin * 0.6);
-        orientRadial(triBrush, theta0, zTop, radius - recessDepth);
-        brushes.push(triBrush);
-    }
+    const zCenterOffset = -height / 2;
+    const rowsSpan = (gridRows - 1) * lineSpacing;
 
-    // Rectangle near bottom opposite the seam
-    {
-        const rectShape = createRectangleShape(rectWidth, rectHeight);
-        const rectGeom = new THREE.ExtrudeGeometry(rectShape, { depth: recessDepth, bevelEnabled: false });
-        const rectBrush = new Brush(rectGeom, material);
-        const zBot = -(height / 2) + Math.max(2, topMargin * 0.6);
-        orientRadial(rectBrush, theta1, zBot, radius - recessDepth);
-        brushes.push(rectBrush);
+    for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
+        const yLocal = (height / 2) + yAdjust + (rowsSpan / 2 - rowIdx * lineSpacing);
+        const zLocal = yLocal + zCenterOffset;
+
+        const xCellStart = leftMargin + xAdjust;
+        const thetaStart = (xCellStart / circumference) * Math.PI * 2 + thetaOffset;
+
+        const xCellEnd = leftMargin + ((availableColumns + 1) * cellSpacing) + xAdjust;
+        const thetaEnd = (xCellEnd / circumference) * Math.PI * 2 + thetaOffset;
+
+        // Start-of-row rectangle (vertical-ish bar)
+        {
+            const rectShape = createRectangleShape(rectWidth, rectHeight);
+            const rectGeom = new THREE.ExtrudeGeometry(rectShape, { depth: recessDepth, bevelEnabled: false });
+            const rectBrush = new Brush(rectGeom, material);
+            orientRadial(rectBrush, thetaStart, zLocal, radius - recessDepth);
+            brushes.push(rectBrush);
+        }
+
+        // End-of-row triangle pointing along +X (planar right → tangential)
+        {
+            const triShape = createEquilateralTriangleShape(triangleSize);
+            const triGeom = new THREE.ExtrudeGeometry(triShape, { depth: recessDepth, bevelEnabled: false });
+            triGeom.rotateZ(-Math.PI / 2);
+            const triBrush = new Brush(triGeom, material);
+            orientRadial(triBrush, thetaEnd, zLocal, radius - recessDepth);
+            brushes.push(triBrush);
+        }
     }
 
     return brushes;
@@ -260,7 +284,7 @@ export function buildCardEmbossingPlate(translatedLines, settings) {
         }
     }
 
-    // Subtract recessed indicators from base
+    // Subtract recessed indicators from base (start-of-row rectangle, end-of-row triangle)
     const evaluator = new Evaluator();
     const indicatorBrushes = buildCardIndicatorBrushes(settings, material);
     let finalBase = baseBrush;
@@ -313,7 +337,7 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
         const evaluator = new Evaluator();
         finalCylBrush = evaluator.evaluate(finalCylBrush, cutoutBrush, SUBTRACTION);
     }
-    // Subtract recessed indicators from cylinder base
+    // Subtract recessed indicators from cylinder base (start-of-row rectangle, end-of-row triangle)
     {
         const evaluator = new Evaluator();
         const indicatorBrushes = buildCylinderIndicatorBrushes(settings, cylinderParams, material);
@@ -413,7 +437,7 @@ export function buildCardCounterPlate(settings) {
     const xAdjust = toNumber(settings.braille_x_adjust, 0);
     const yAdjust = toNumber(settings.braille_y_adjust, 0);
     const gridRows = getGridRows(settings);
-    const totalColumns = Number(settings.grid_columns || settings.gridColumns || 14);
+    const availableColumns = getAvailableColumns(settings);
 
     // Sphere radius for recess (slightly oversized via offset if provided)
     const baseDiameter = toNumber(settings.emboss_dot_base_diameter, 1.5);
@@ -425,7 +449,7 @@ export function buildCardCounterPlate(settings) {
     // Sphere placed with center on the top surface (z = thickness) creates a hemispherical recess
     const plateThickness = toNumber(settings.card_thickness, 1.6);
 
-    // Build all recess brushes, rows centered vertically on the card
+    // Build all recess brushes, rows centered vertically on the card (exclude reserved first/last columns)
     const recessBrushes = [];
     const cardHeight = toNumber(settings.card_height, 54);
     const rowsSpan = (gridRows - 1) * lineSpacing;
@@ -433,7 +457,7 @@ export function buildCardCounterPlate(settings) {
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
         const yCellCenter = centerY + (rowsSpan / 2 - rowIdx * lineSpacing);
 
-        for (let col = 0; col < totalColumns; col++) {
+        for (let col = 0; col < availableColumns; col++) {
             const xCellCenter = leftMargin + ((col + 1) * cellSpacing) + xAdjust;
             for (let r = 0; r < 3; r++) {
                 for (let c = 0; c < 2; c++) {
@@ -453,17 +477,21 @@ export function buildCardCounterPlate(settings) {
 
     const evaluator = new Evaluator();
 
-    // Union all spheres using balanced strategy to reduce complexity
-    const unionBrush = balancedUnion(evaluator, recessBrushes);
+    // Subtract recessed dot spheres
+    const unionDots = balancedUnion(evaluator, recessBrushes);
 
-    // If there are no recesses (edge case), just return the base
-    if (!unionBrush) {
-        const fallbackGroup = new THREE.Group();
-        fallbackGroup.add(baseBrush);
-        return fallbackGroup;
+    let current = baseBrush;
+    if (unionDots) {
+        current = evaluator.evaluate(current, unionDots, SUBTRACTION);
     }
 
-    const resultBrush = evaluator.evaluate(baseBrush, unionBrush, SUBTRACTION);
+    // Subtract per-row indicators (start rectangle, end triangle) for universal counter plate
+    const indicatorBrushes = buildCardIndicatorBrushes(settings, material);
+    let resultBrush = current;
+    if (indicatorBrushes.length > 0) {
+        const unionIndicators = balancedUnion(evaluator, indicatorBrushes);
+        resultBrush = evaluator.evaluate(current, unionIndicators, SUBTRACTION);
+    }
     // Return as a group for consistency with callers
     const resultGroup = new THREE.Group();
     resultGroup.add(resultBrush);
@@ -525,7 +553,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const xAdjust = toNumber(settings.braille_x_adjust, 0);
     const yAdjust = toNumber(settings.braille_y_adjust, 0);
     const gridRows = getGridRows(settings);
-    const totalColumns = Number(settings.grid_columns || settings.gridColumns || 14);
+    const availableColumns = getAvailableColumns(settings);
 
     const circumference = Math.PI * diameter;
     const thetaOffset = seamOffsetDeg * Math.PI / 180;
@@ -538,7 +566,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
         const yLocal = (height / 2) + yAdjust + (rowsSpan / 2 - rowIdx * lineSpacing);
 
-        for (let col = 0; col < totalColumns; col++) {
+        for (let col = 0; col < availableColumns; col++) {
             const xCell = leftMargin + ((col + 1) * cellSpacing) + xAdjust;
             const baseTheta = (xCell / circumference) * Math.PI * 2 + thetaOffset;
 
@@ -566,15 +594,20 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
         }
     }
 
-    const unionBrush = balancedUnion(evaluator, recessBrushes);
+    const unionDots = balancedUnion(evaluator, recessBrushes);
 
-    if (!unionBrush) {
-        const fallbackGroup = new THREE.Group();
-        fallbackGroup.add(currentBaseBrush);
-        return fallbackGroup;
+    let current = currentBaseBrush;
+    if (unionDots) {
+        current = evaluator.evaluate(current, unionDots, SUBTRACTION);
     }
 
-    const resultBrush = evaluator.evaluate(currentBaseBrush, unionBrush, SUBTRACTION);
+    // Subtract per-row indicators for universal counter plate
+    const indicatorBrushes = buildCylinderIndicatorBrushes(settings, cylinderParams, material);
+    let resultBrush = current;
+    if (indicatorBrushes.length > 0) {
+        const unionIndicators = balancedUnion(evaluator, indicatorBrushes);
+        resultBrush = evaluator.evaluate(current, unionIndicators, SUBTRACTION);
+    }
     const resultGroup = new THREE.Group();
     resultGroup.add(resultBrush);
     return resultGroup;
