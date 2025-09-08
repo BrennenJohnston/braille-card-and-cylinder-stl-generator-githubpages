@@ -1,7 +1,7 @@
 // Minimal ASCII STL exporter for THREE.js geometries
 // Exports a THREE.Object3D (Mesh or Group) to an ASCII STL Blob
 
-import * as THREE from './three.module.js';
+import * as THREE from 'three';
 
 function writeFacet(lines, normal, a, b, c) {
     lines.push(`  facet normal ${normal.x} ${normal.y} ${normal.z}`);

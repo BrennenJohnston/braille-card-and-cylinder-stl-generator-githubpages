@@ -3023,45 +3023,22 @@
             log.debug('Cylinder Params:', cylinderParams);
             
             try {
-                // Client-side STL generation using OpenJSCAD in a module worker; fallback to Three.js on error
-                let stlBlob;
-                try {
-                    const workerUrl = new URL('static/jscad-worker.js', document.baseURI);
-                    const jscadWorker = new Worker(workerUrl.href, { type: 'module' });
-                    const reqId = Math.random().toString(36).slice(2);
-                    const msg = { id: reqId, type: 'generate', data: { plateType, shapeType, settings, cylinderParams, translatedLines } };
-                    const stlText = await new Promise((resolve, reject) => {
-                        const timer = setTimeout(() => reject(new Error('JSCAD worker timeout')), 20000);
-                        jscadWorker.onmessage = (e) => {
-                            const { id, type, result } = e.data || {};
-                            if (id !== reqId || type !== 'generate') return;
-                            clearTimeout(timer);
-                            jscadWorker.terminate();
-                            if (result && result.success) resolve(result.stlText);
-                            else reject(new Error(result && result.error ? result.error : 'Unknown worker error'));
-                        };
-                        jscadWorker.onerror = (err) => { clearTimeout(timer); jscadWorker.terminate(); reject(err.message || String(err)); };
-                        jscadWorker.postMessage(msg);
-                    });
-                    stlBlob = new Blob([stlText], { type: 'model/stl' });
-                } catch (workerErr) {
-                    log.error('JSCAD worker failed, falling back to Three.js STL generation:', workerErr);
-                    let object3D;
-                    if (plateType === 'positive') {
-                        if (shapeType === 'cylinder') {
-                            object3D = buildCylinderEmbossingPlate(translatedLines, settings, cylinderParams);
-                        } else {
-                            object3D = buildCardEmbossingPlate(translatedLines, settings);
-                        }
+                // Lightweight path: always use Three.js to build geometry and export STL
+                let object3D;
+                if (plateType === 'positive') {
+                    if (shapeType === 'cylinder') {
+                        object3D = buildCylinderEmbossingPlate(translatedLines, settings, cylinderParams);
                     } else {
-                        if (shapeType === 'cylinder') {
-                            object3D = buildCylinderCounterPlate(settings, cylinderParams);
-                        } else {
-                            object3D = buildCardCounterPlate(settings);
-                        }
+                        object3D = buildCardEmbossingPlate(translatedLines, settings);
                     }
-                    stlBlob = exportObjectToAsciiSTL(object3D, `braille_${plateType}_${shapeType}`);
+                } else {
+                    if (shapeType === 'cylinder') {
+                        object3D = buildCylinderCounterPlate(settings, cylinderParams);
+                    } else {
+                        object3D = buildCardCounterPlate(settings);
+                    }
                 }
+                const stlBlob = exportObjectToAsciiSTL(object3D, `braille_${plateType}_${shapeType}`);
                 if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
                 lastSTLUrl = URL.createObjectURL(stlBlob);
                 

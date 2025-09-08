@@ -1,7 +1,7 @@
 // Geometry builders for client-side STL generation
 // Uses three.js primitives to construct positive embossing plates for card and cylinder
 
-import * as THREE from './three.module.js';
+import * as THREE from 'three';
 import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg';
 
 // Helper to union many brushes using a balanced strategy to reduce CSG complexity
