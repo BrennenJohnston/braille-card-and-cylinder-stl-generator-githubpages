@@ -104,10 +104,15 @@ export function buildCardEmbossingPlate(translatedLines, settings) {
 
     const dotGeom = createDotGeometry(settings);
 
+    // Center rows vertically on the card
+    const cardHeight = toNumber(settings.card_height, 54);
+    const rowsSpan = (gridRows - 1) * lineSpacing;
+    const centerY = cardHeight / 2 + yAdjust;
+
     // Build dot meshes for each translated character
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
         const brailleText = (translatedLines[rowIdx] || '').slice(0, availableColumns);
-        const yPos = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust;
+        const yPos = centerY + (rowsSpan / 2 - rowIdx * lineSpacing);
 
         for (let col = 0; col < brailleText.length; col++) {
             const ch = brailleText[col];
@@ -202,10 +207,11 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
 
     const dotGeom = createDotGeometry(settings);
     const zCenterOffset = -height / 2; // center cylinder along Z
+    const rowsSpan = (gridRows - 1) * lineSpacing; // vertical span across all rows
 
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
         const brailleText = (translatedLines[rowIdx] || '').slice(0, availableColumns);
-        const yLocal = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust; // planar Y maps to local Z
+        const yLocal = (height / 2) + yAdjust + (rowsSpan / 2 - rowIdx * lineSpacing); // planar Y maps to local Z (centered)
 
         for (let col = 0; col < brailleText.length; col++) {
             const ch = brailleText[col];
@@ -278,10 +284,13 @@ export function buildCardCounterPlate(settings) {
     // Sphere placed with center on the top surface (z = thickness) creates a hemispherical recess
     const plateThickness = toNumber(settings.card_thickness, 1.6);
 
-    // Build all recess brushes
+    // Build all recess brushes, rows centered vertically on the card
     const recessBrushes = [];
+    const cardHeight = toNumber(settings.card_height, 54);
+    const rowsSpan = (gridRows - 1) * lineSpacing;
+    const centerY = cardHeight / 2 + yAdjust;
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
-        const yCellCenter = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust;
+        const yCellCenter = centerY + (rowsSpan / 2 - rowIdx * lineSpacing);
 
         for (let col = 0; col < totalColumns; col++) {
             const xCellCenter = leftMargin + ((col + 1) * cellSpacing) + xAdjust;
@@ -380,11 +389,13 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const circumference = Math.PI * diameter;
     const thetaOffset = seamOffsetDeg * Math.PI / 180;
 
-    // Build all recess brushes positioned on cylinder surface (slightly inside for robust subtraction)
+    // Build all recess brushes positioned on cylinder surface (slightly inside for robust subtraction),
+    // with rows centered along cylinder height
     const recessBrushes = [];
     const zCenterOffset = -height / 2;
+    const rowsSpan = (gridRows - 1) * lineSpacing;
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
-        const yLocal = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust;
+        const yLocal = (height / 2) + yAdjust + (rowsSpan / 2 - rowIdx * lineSpacing);
 
         for (let col = 0; col < totalColumns; col++) {
             const xCell = leftMargin + ((col + 1) * cellSpacing) + xAdjust;
