@@ -2,12 +2,15 @@
 // Loads @jscad/modeling and @jscad/stl-serializer via ESM CDN (esm.sh) so no bundling is required.
 
 // Import OpenJSCAD libraries from CDN as ESM
-import { booleans, primitives, transforms } from 'https://esm.sh/@jscad/modeling@2?bundle';
+import { booleans, primitives, transforms, extrusions, text, geometries } from 'https://esm.sh/@jscad/modeling@2?bundle';
 import { serializeText } from 'https://esm.sh/@jscad/stl-serializer@2?bundle';
 
 const { union, subtract } = booleans;
 const { cuboid, cylinder, sphere } = primitives;
-const { translate, rotateX, rotateZ } = transforms;
+const { translate, rotateX, rotateZ, rotateY } = transforms;
+const { extrudeLinear } = extrusions;
+const { vectorText } = text;
+const { geom2 } = geometries;
 
 function toNumber(v, fallback = 0) {
     const n = Number(v);
@@ -37,7 +40,7 @@ function buildCardPositive(translatedLines, settings) {
     const t = toNumber(settings.card_thickness, 1.6);
 
     // Base plate centered at origin
-    let shape = cuboid({ size: [w, h, t] });
+    let base = cuboid({ size: [w, h, t] });
 
     const dotSpacing = toNumber(settings.dot_spacing, 2.54);
     const dotColOffsets = [-dotSpacing / 2, dotSpacing / 2];
@@ -80,10 +83,18 @@ function buildCardPositive(translatedLines, settings) {
         }
     }
 
-    if (dots.length > 0) {
-        shape = union(shape, ...dots);
+    // Add recessed indicators (triangle, rectangle, and optional text)
+    const indicators = buildCardIndicatorCutters(settings);
+    const textCutters = buildCardTextCutters(settings);
+    const allCutters = indicators.concat(textCutters);
+    if (allCutters.length > 0) {
+        base = subtract(base, union(...allCutters));
     }
-    return shape;
+
+    if (dots.length > 0) {
+        return union(base, ...dots);
+    }
+    return base;
 }
 
 function buildCardCounter(settings) {
@@ -186,8 +197,14 @@ function buildCylinderPositive(translatedLines, settings, cylinderParams = {}) {
         }
     }
 
+    // Recessed indicators (triangle, rectangle, and optional text) carved into cylinder base before dot union
+    const cutters = buildCylinderIndicatorCutters(settings, cylinderParams).concat(buildCylinderTextCutters(settings, cylinderParams));
+    if (cutters.length > 0) {
+        cyl = subtract(cyl, union(...cutters));
+    }
+
     if (dots.length > 0) {
-        cyl = union(cyl, ...dots);
+        return union(cyl, ...dots);
     }
     return cyl;
 }

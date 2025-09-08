@@ -24,6 +24,133 @@ function balancedUnion(evaluator, brushes) {
 // Note: Removed external CSG dependency for maximum compatibility on static hosting (GitHub Pages).
 // All geometry is now built using native THREE primitives only.
 
+// --- Indicator Helpers (recessed shapes) ---
+function createEquilateralTriangleShape(size) {
+    const shape = new THREE.Shape();
+    // Equilateral triangle centered at origin; vertices at 90°, 210°, 330°
+    const r = size / Math.sqrt(3); // circumradius for side-length ~= size
+    for (let i = 0; i < 3; i++) {
+        const theta = Math.PI / 2 + i * (2 * Math.PI / 3);
+        const x = Math.cos(theta) * r;
+        const y = Math.sin(theta) * r;
+        if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+    }
+    shape.closePath();
+    return shape;
+}
+
+function createRectangleShape(width, height) {
+    const hw = width / 2;
+    const hh = height / 2;
+    const shape = new THREE.Shape();
+    shape.moveTo(-hw, -hh);
+    shape.lineTo(hw, -hh);
+    shape.lineTo(hw, hh);
+    shape.lineTo(-hw, hh);
+    shape.closePath();
+    return shape;
+}
+
+function buildCardIndicatorBrushes(settings, material) {
+    const brushes = [];
+
+    const w = toNumber(settings.card_width, 86);
+    const h = toNumber(settings.card_height, 54);
+    const t = toNumber(settings.card_thickness, 1.6);
+    const cellSpacing = toNumber(settings.cell_spacing, 6.0);
+    const leftMargin = toNumber(settings.left_margin, 8);
+    const topMargin = toNumber(settings.top_margin, 8);
+
+    // Sizes and depth
+    const triangleSize = Math.max(2, cellSpacing * 0.9);
+    const rectWidth = Math.max(2, cellSpacing * 0.9);
+    const rectHeight = Math.max(1.5, cellSpacing * 0.6);
+    const recessDepth = Math.min(0.8, Math.max(0.2, toNumber(settings.indicator_recess_depth, 0.5)));
+
+    // Triangle at top-left margin area
+    {
+        const triShape = createEquilateralTriangleShape(triangleSize);
+        const triGeom = new THREE.ExtrudeGeometry(triShape, { depth: recessDepth, bevelEnabled: false });
+        const triBrush = new Brush(triGeom, material);
+        // Place so that the extrude (0..depth) sits inside plate top surface
+        triBrush.position.set(
+            Math.max(2, leftMargin * 0.6),
+            Math.max(2, topMargin * 0.6),
+            t - recessDepth
+        );
+        triBrush.updateMatrixWorld(true);
+        brushes.push(triBrush);
+    }
+
+    // Rectangle at bottom-right margin area
+    {
+        const rectShape = createRectangleShape(rectWidth, rectHeight);
+        const rectGeom = new THREE.ExtrudeGeometry(rectShape, { depth: recessDepth, bevelEnabled: false });
+        const rectBrush = new Brush(rectGeom, material);
+        rectBrush.position.set(
+            w - Math.max(2, leftMargin * 0.6),
+            h - Math.max(2, topMargin * 0.6),
+            t - recessDepth
+        );
+        rectBrush.updateMatrixWorld(true);
+        brushes.push(rectBrush);
+    }
+
+    return brushes;
+}
+
+function buildCylinderIndicatorBrushes(settings, cylinderParams, material) {
+    const brushes = [];
+
+    const diameter = toNumber(cylinderParams.diameter_mm, 31.35);
+    const height = toNumber(cylinderParams.height_mm, toNumber(settings.card_height, 54));
+    const seamOffsetDeg = toNumber(cylinderParams.seam_offset_deg, 355);
+    const radius = diameter / 2;
+    const topMargin = toNumber(settings.top_margin, 8);
+    const cellSpacing = toNumber(settings.cell_spacing, 6.0);
+
+    const recessDepth = Math.min(0.8, Math.max(0.2, toNumber(settings.indicator_recess_depth, 0.5)));
+    const triangleSize = Math.max(2, cellSpacing * 0.9);
+    const rectWidth = Math.max(2, cellSpacing * 0.9);
+    const rectHeight = Math.max(1.5, cellSpacing * 0.6);
+
+    const theta0 = seamOffsetDeg * Math.PI / 180;
+    const theta1 = theta0 + Math.PI; // opposite side
+
+    // Helper to orient a brush so local +Z points along given radial direction
+    function orientRadial(brush, theta, zWorld, radialDistance) {
+        const rHat = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), rHat);
+        brush.setRotationFromQuaternion(q);
+        const xWorld = rHat.x * radialDistance;
+        const yWorld = rHat.y * radialDistance;
+        brush.position.set(xWorld, yWorld, zWorld);
+        brush.updateMatrixWorld(true);
+    }
+
+    // Triangle near top at seam
+    {
+        const triShape = createEquilateralTriangleShape(triangleSize);
+        const triGeom = new THREE.ExtrudeGeometry(triShape, { depth: recessDepth, bevelEnabled: false });
+        const triBrush = new Brush(triGeom, material);
+        const zTop = (height / 2) - Math.max(2, topMargin * 0.6);
+        orientRadial(triBrush, theta0, zTop, radius - recessDepth);
+        brushes.push(triBrush);
+    }
+
+    // Rectangle near bottom opposite the seam
+    {
+        const rectShape = createRectangleShape(rectWidth, rectHeight);
+        const rectGeom = new THREE.ExtrudeGeometry(rectShape, { depth: recessDepth, bevelEnabled: false });
+        const rectBrush = new Brush(rectGeom, material);
+        const zBot = -(height / 2) + Math.max(2, topMargin * 0.6);
+        orientRadial(rectBrush, theta1, zBot, radius - recessDepth);
+        brushes.push(rectBrush);
+    }
+
+    return brushes;
+}
+
 function getAvailableColumns(settings) {
     const gridColumns = Number(settings.grid_columns || settings.gridColumns || 26);
     return Math.max(0, gridColumns - 2);
@@ -76,12 +203,13 @@ export function buildCardEmbossingPlate(translatedLines, settings) {
 
     // Base plate (we'll carve recessed indicators into this using CSG)
     const baseGeom = createBasePlateGeometry(settings);
-    const baseMeshPre = new THREE.Mesh(baseGeom, material);
-    baseMeshPre.position.set(
+    const baseBrush = new Brush(baseGeom, material);
+    baseBrush.position.set(
         toNumber(settings.card_width, 86) / 2,
         toNumber(settings.card_height, 54) / 2,
         toNumber(settings.card_thickness, 1.6) / 2
     );
+    baseBrush.updateMatrixWorld(true);
 
     // Dot positioning constants
     const dotSpacing = toNumber(settings.dot_spacing, 2.54);
@@ -132,8 +260,15 @@ export function buildCardEmbossingPlate(translatedLines, settings) {
         }
     }
 
-    // Add base plate without recessed indicators (CSG removed)
-    group.add(baseMeshPre);
+    // Subtract recessed indicators from base
+    const evaluator = new Evaluator();
+    const indicatorBrushes = buildCardIndicatorBrushes(settings, material);
+    let finalBase = baseBrush;
+    if (indicatorBrushes.length > 0) {
+        const unionBrush = balancedUnion(evaluator, indicatorBrushes);
+        finalBase = evaluator.evaluate(baseBrush, unionBrush, SUBTRACTION);
+    }
+    group.add(finalBase);
 
     return group;
 }
@@ -154,7 +289,8 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
     cylGeomY.rotateX(Math.PI / 2);
 
     // Optional polygonal cutout: create an extruded 12-gon shaft and subtract via CSG if radius provided
-    let finalCylGeom = cylGeomY;
+    let finalCylBrush = new Brush(cylGeomY, material);
+    finalCylBrush.updateMatrixWorld(true);
     const cutoutRadius = Math.max(0, cutoutInscribed);
     if (cutoutRadius > 0) {
         // Build 2D 12-gon in XY plane, then extrude along Z to cylinder height
@@ -172,16 +308,21 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
         extrudeGeom.translate(0, 0, - (height + 2) / 2);
 
         // Use BVH CSG subtraction to create the hole
-        const cylinderBrush = new Brush(cylGeomY, material);
         const cutoutBrush = new Brush(extrudeGeom, material);
-        cylinderBrush.updateMatrixWorld(true);
         cutoutBrush.updateMatrixWorld(true);
         const evaluator = new Evaluator();
-        const subtracted = evaluator.evaluate(cylinderBrush, cutoutBrush, SUBTRACTION);
-        finalCylGeom = subtracted.geometry;
+        finalCylBrush = evaluator.evaluate(finalCylBrush, cutoutBrush, SUBTRACTION);
     }
-    const cylMesh = new THREE.Mesh(finalCylGeom, material);
-    group.add(cylMesh);
+    // Subtract recessed indicators from cylinder base
+    {
+        const evaluator = new Evaluator();
+        const indicatorBrushes = buildCylinderIndicatorBrushes(settings, cylinderParams, material);
+        if (indicatorBrushes.length > 0) {
+            const unionBrush = balancedUnion(evaluator, indicatorBrushes);
+            finalCylBrush = evaluator.evaluate(finalCylBrush, unionBrush, SUBTRACTION);
+        }
+    }
+    group.add(finalCylBrush);
 
     // Dot positioning constants
     const dotSpacing = toNumber(settings.dot_spacing, 2.54);

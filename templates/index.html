@@ -2346,6 +2346,9 @@
             actionBtn.setAttribute('aria-label', 'Download generated STL file');
             actionBtn.style.opacity = '1';
             actionBtn.disabled = false;
+            errorText.textContent = '';
+            errorDiv.style.display = 'none';
+            errorDiv.className = 'error-message';
         }
         
         // Store the current plate type for download naming
@@ -3104,6 +3107,9 @@
             const loader = new STLLoader();
             loader.load(url, function (geometry) {
                 if (mesh) scene.remove(mesh);
+                errorText.textContent = '';
+                errorDiv.style.display = 'none';
+                errorDiv.className = 'error-message';
                 
                 // Center the geometry first
                 geometry.center();
