@@ -3305,23 +3305,46 @@
                 // Initialize liblouis web worker
                 log.debug('Initializing liblouis web worker...');
                 
-                // Resolve worker URL relative to this module for GitHub Pages base paths
-                const workerUrl = new URL('../static/liblouis-worker.js', import.meta.url);
-                
-                // Test if worker file is accessible first (using resolved URL)
-                try {
-                    const workerResponse = await fetch(workerUrl.href, { cache: 'no-store' });
-                    if (!workerResponse.ok) {
-                        throw new Error(`Worker file not accessible: ${workerResponse.status}`);
+                // Construct a worker from a Blob to avoid base-path and CORS issues
+                const staticBase = new URL('../static/', import.meta.url).href;
+                const workerSource = `
+                    let liblouisInstance = null; let liblouisReady = false;
+                    try {
+                        importScripts('${staticBase}liblouis/build-no-tables-utf16.js');
+                        importScripts('${staticBase}liblouis/easy-api.js');
+                    } catch (e) { self.postMessage({ id: -1, type: 'init', result: { success: false, error: 'Worker imports failed: ' + e.message } }); }
+                    async function initializeLiblouis(){
+                        try {
+                            await new Promise(r=>setTimeout(r,50));
+                            if (typeof liblouisBuild !== 'undefined' && typeof LiblouisEasyApi !== 'undefined') {
+                                liblouisInstance = new LiblouisEasyApi(liblouisBuild);
+                                try { liblouisInstance.enableOnDemandTableLoading('${staticBase}liblouis/tables/'); } catch (_ignored) {}
+                                liblouisReady = true; return { success: true };
+                            } else { throw new Error('Liblouis scripts not loaded'); }
+                        } catch (err) { return { success: false, error: err.message }; }
                     }
-                    log.debug('Worker file is accessible');
-                } catch (fetchError) {
-                    log.error('Worker file test failed:', fetchError);
-                    throw new Error('Cannot access worker file: ' + fetchError.message);
-                }
-                
-                // Create the worker from the resolved URL
-                liblouisWorker = new Worker(workerUrl.href);
+                    self.onmessage = async (e)=>{
+                        const { id, type, data } = e.data;
+                        try {
+                            if (type === 'init') { const r = await initializeLiblouis(); self.postMessage({ id, type: 'init', result: r }); return; }
+                            if (type === 'translate') {
+                                if (!liblouisReady || !liblouisInstance) throw new Error('Liblouis not initialized');
+                                const { text, grade, tableName } = data || {};
+                                const selected = tableName ? tableName : (grade === 'g2' ? 'en-ueb-g2.ctb' : 'en-ueb-g1.ctb');
+                                const tableFormat = 'unicode.dis,' + selected;
+                                const out = liblouisInstance.translateString(tableFormat, text);
+                                const ok = out.split('').some(c=>{ const code=c.charCodeAt(0); return code>=0x2800 && code<=0x28FF; });
+                                if (!ok) throw new Error('Translation not Unicode braille');
+                                self.postMessage({ id, type: 'translate', result: { success: true, translation: out } });
+                                return;
+                            }
+                            throw new Error('Unknown message type');
+                        } catch (err) { self.postMessage({ id, type, result: { success: false, error: err.message } }); }
+                    };
+                `;
+                const blob = new Blob([workerSource], { type: 'application/javascript' });
+                const blobUrl = URL.createObjectURL(blob);
+                liblouisWorker = new Worker(blobUrl);
                 
                 // Handle worker messages
                 liblouisWorker.onmessage = function(e) {
