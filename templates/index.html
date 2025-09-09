@@ -1704,11 +1704,29 @@
                         <div class="grade-selection">
                             <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Counter Dot Dimensions</label>
                             <div>
+                                <label for="counter_plate_dot_cylinder_diameter">Counter Dot Cylinder Diameter (mm):</label>
+                                <input type="number" id="counter_plate_dot_cylinder_diameter" name="counter_plate_dot_cylinder_diameter" value="" step="0.1" placeholder="Default: matches emboss cylinder" title="If empty, uses the emboss plate cylinder diameter">
+                            </div>
+                            <div>
+                                <label for="counter_plate_dot_cylinder_height">Counter Dot Cylinder Height (mm):</label>
+                                <input type="number" id="counter_plate_dot_cylinder_height" name="counter_plate_dot_cylinder_height" value="" step="0.01" placeholder="Default: matches emboss cylinder" title="If empty, uses the emboss plate cylinder height">
+                            </div>
+                            <div>
+                                <label for="counter_plate_dot_dome_height">Counter Dot Dome Height (mm):</label>
+                                <input type="number" id="counter_plate_dot_dome_height" name="counter_plate_dot_dome_height" value="" step="0.1" placeholder="Default: matches emboss dome" title="If empty, uses the emboss plate dome height">
+                            </div>
+                            <div style="margin-top: 10px;">
                                 <label for="counter_plate_dot_size_offset">Counter Dot Diameter Offset (mm):</label>
                                 <input type="number" id="counter_plate_dot_size_offset" name="counter_plate_dot_size_offset" value="0.0" step="0.1" aria-describedby="offset-help" title="Adjusts the counter plate braille dot base diameter relative to the emboss plate diameter">
                                 <div id="offset-help" class="offset-note" style="font-size: 0.85em; margin-top: 2px;">
                                     Adds or subtracts from the Universal Counter Plate's recessed dot diameter. The dot size mirrors the Embossing Plate's Cylinder Base Diameter by default.
                                 </div>
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <label>
+                                    <input type="checkbox" id="performance_mode" name="performance_mode" style="margin-right: 5px;">
+                                    Performance Mode (faster generation with simpler geometry)
+                                </label>
                             </div>
                         </div>
 
@@ -2487,6 +2505,9 @@
                 'emboss_dot_cylinder_diameter',
                 'emboss_dot_cylinder_height', 
                 'emboss_dot_dome_height',
+                'counter_plate_dot_cylinder_diameter',
+                'counter_plate_dot_cylinder_height',
+                'counter_plate_dot_dome_height',
                 'counter_plate_dot_size_offset',
                 'grid_columns',
                 'grid_rows',
@@ -2682,6 +2703,9 @@
             'emboss_dot_cylinder_diameter',
             'emboss_dot_cylinder_height', 
             'emboss_dot_dome_height',
+            'counter_plate_dot_cylinder_diameter',
+            'counter_plate_dot_cylinder_height',
+            'counter_plate_dot_dome_height',
             'grid_columns',
             'grid_rows',
             'cell_spacing',
@@ -2944,7 +2968,11 @@
                 emboss_dot_cylinder_diameter: document.getElementById('emboss_dot_cylinder_diameter').value,
                 emboss_dot_cylinder_height: document.getElementById('emboss_dot_cylinder_height').value,
                 emboss_dot_dome_height: document.getElementById('emboss_dot_dome_height').value,
+                counter_plate_dot_cylinder_diameter: document.getElementById('counter_plate_dot_cylinder_diameter').value,
+                counter_plate_dot_cylinder_height: document.getElementById('counter_plate_dot_cylinder_height').value,
+                counter_plate_dot_dome_height: document.getElementById('counter_plate_dot_dome_height').value,
                 counter_plate_dot_size_offset: document.getElementById('counter_plate_dot_size_offset').value,
+                performance_mode: document.getElementById('performance_mode').checked,
                 card_width: document.getElementById('card_width').value,
                 card_height: document.getElementById('card_height').value,
                 card_thickness: document.getElementById('card_thickness').value,
@@ -3023,6 +3051,13 @@
             log.debug('Shape Type:', shapeType);
             log.debug('Cylinder Params:', cylinderParams);
             
+            // Helper function to show processing messages
+            function setProcessingMessage(message) {
+                errorText.textContent = message;
+                errorDiv.style.display = 'flex';
+                errorDiv.className = 'error-message info';
+            }
+            
             try {
                 // Lightweight path: always use Three.js to build geometry and export STL
                 let object3D;
@@ -3033,6 +3068,10 @@
                         object3D = buildCardEmbossingPlate(translatedLines, settings);
                     }
                 } else {
+                    // Show progress message for counter plate generation
+                    setProcessingMessage('Generating counter plate geometry... This may take a moment for complex grids.');
+                    await new Promise(r => setTimeout(r, 10)); // Let message render
+                    
                     if (shapeType === 'cylinder') {
                         object3D = buildCylinderCounterPlate(settings, cylinderParams);
                     } else {

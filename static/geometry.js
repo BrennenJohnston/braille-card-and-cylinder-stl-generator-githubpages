@@ -29,12 +29,239 @@ function brailleUnicodeToDots(ch) {
     return dots; // order: [1,2,3,4,5,6]
 }
 
+function createRecessDotGeometry(settings) {
+    // Counter plate recess parameters - independent from emboss parameters
+    const embossCylinderDiameter = toNumber(settings.emboss_dot_cylinder_diameter || settings.emboss_dot_base_diameter, 1.5);
+    const embossCylinderHeight = toNumber(settings.emboss_dot_cylinder_height || settings.emboss_dot_height, 0.1);
+    const embossDomeHeight = toNumber(settings.emboss_dot_dome_height || 0.5, 0.5);
+    const offset = toNumber(settings.counter_plate_dot_size_offset, 0.0);
+    
+    // Performance optimization: use simple geometry if performance mode is enabled or dome height is very small
+    const useSimpleGeometry = settings.performance_mode || embossDomeHeight < 0.1;
+    
+    // Use counter plate specific parameters if provided (non-empty), otherwise fall back to emboss parameters + offset
+    const cylinderDiameter = settings.counter_plate_dot_cylinder_diameter && settings.counter_plate_dot_cylinder_diameter.trim() !== '' 
+        ? toNumber(settings.counter_plate_dot_cylinder_diameter, embossCylinderDiameter + offset)
+        : embossCylinderDiameter + offset;
+    
+    const cylinderHeight = settings.counter_plate_dot_cylinder_height && settings.counter_plate_dot_cylinder_height.trim() !== ''
+        ? toNumber(settings.counter_plate_dot_cylinder_height, embossCylinderHeight)
+        : embossCylinderHeight;
+    
+    const domeHeight = settings.counter_plate_dot_dome_height && settings.counter_plate_dot_dome_height.trim() !== ''
+        ? toNumber(settings.counter_plate_dot_dome_height, embossDomeHeight)
+        : embossDomeHeight;
+    const radialSegments = 8; // Reduced for better performance
+    
+    // Create cylinder recess
+    const cylinderRadius = Math.max(0, cylinderDiameter / 2);
+    const totalHeight = cylinderHeight + domeHeight;
+    
+    // Debug logging
+    console.log('Counter plate recess dot dimensions:', {
+        cylinderDiameter,
+        cylinderHeight,
+        domeHeight,
+        offset,
+        embossCylinderDiameter,
+        embossCylinderHeight,
+        embossDomeHeight,
+        useSimpleGeometry,
+        totalHeight,
+        cylinderRadius,
+        geometryOrientation: 'Extends from z=0 to z=-totalHeight (inward)',
+        settings: {
+            counter_plate_dot_cylinder_diameter: settings.counter_plate_dot_cylinder_diameter,
+            counter_plate_dot_cylinder_height: settings.counter_plate_dot_cylinder_height,
+            counter_plate_dot_dome_height: settings.counter_plate_dot_dome_height
+        }
+    });
+    
+    if (useSimpleGeometry) {
+        // Simple cylinder for better performance
+        const cylinderGeom = new THREE.CylinderGeometry(cylinderRadius, cylinderRadius, totalHeight, radialSegments, 1, false);
+        // Rotate from Y-axis to Z-axis
+        cylinderGeom.rotateX(Math.PI / 2);
+        
+        // Translate to extend from 0 to -totalHeight
+        const positions = cylinderGeom.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            positions[i + 2] -= totalHeight / 2;
+        }
+        cylinderGeom.attributes.position.needsUpdate = true;
+        
+        return { 
+            geometry: cylinderGeom, 
+            totalHeight: totalHeight,
+            cylinderRadius: cylinderRadius
+        };
+    }
+    
+    const cylinderGeom = new THREE.CylinderGeometry(cylinderRadius, cylinderRadius, cylinderHeight, radialSegments, 1, false);
+    // Rotate from Y-axis to Z-axis. After rotation, cylinder extends along +Z
+    cylinderGeom.rotateX(Math.PI / 2);
+    
+    // Create dome recess on top of cylinder
+    const sphereRadius = cylinderRadius; // Dome base matches cylinder diameter
+    const sphereGeom = new THREE.SphereGeometry(sphereRadius, radialSegments, radialSegments);
+    
+    // Create dome from hemisphere
+    const positions = sphereGeom.attributes.position;
+    const uvs = sphereGeom.attributes.uv;
+    const newPositions = [];
+    const newUvs = [];
+    const newIndices = [];
+    const vertices = [];
+    
+    // Collect vertices that are above z=0 (top hemisphere) and flip them to point downward
+    for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        const z = positions.getZ(i);
+        
+        if (z >= 0) {
+            // Scale the dome height and flip to point in -Z direction (inward)
+            const scaledZ = -(z / sphereRadius) * domeHeight;
+            vertices.push({ x, y, z: scaledZ, index: i });
+            newPositions.push(x, y, scaledZ);
+            
+            // Transfer UV coordinates if they exist
+            if (uvs) {
+                newUvs.push(uvs.getX(i), uvs.getY(i));
+            }
+        }
+    }
+    
+    // Create new geometry for the dome
+    const domeGeom = new THREE.BufferGeometry();
+    domeGeom.setAttribute('position', new THREE.Float32BufferAttribute(newPositions, 3));
+    
+    // Add UV attribute if it exists in the source
+    if (uvs && newUvs.length > 0) {
+        domeGeom.setAttribute('uv', new THREE.Float32BufferAttribute(newUvs, 2));
+    }
+    
+    // Rebuild indices for the dome
+    const originalIndices = sphereGeom.index.array;
+    const vertexMap = new Map();
+    vertices.forEach((v, newIndex) => {
+        vertexMap.set(v.index, newIndex);
+    });
+    
+    for (let i = 0; i < originalIndices.length; i += 3) {
+        const a = originalIndices[i];
+        const b = originalIndices[i + 1];
+        const c = originalIndices[i + 2];
+        
+        if (vertexMap.has(a) && vertexMap.has(b) && vertexMap.has(c)) {
+            newIndices.push(vertexMap.get(a), vertexMap.get(b), vertexMap.get(c));
+        }
+    }
+    
+    domeGeom.setIndex(newIndices);
+    domeGeom.computeVertexNormals();
+    
+    // Position dome at the end of the cylinder recess
+    // Dome now extends from 0 to -domeHeight, cylinder extends from 0 to -cylinderHeight
+    // So dome should start at -cylinderHeight
+    const domePositions = domeGeom.attributes.position.array;
+    for (let i = 0; i < domePositions.length; i += 3) {
+        domePositions[i + 2] -= cylinderHeight;
+    }
+    domeGeom.attributes.position.needsUpdate = true;
+    
+    // Merge geometries
+    const mergedGeom = new THREE.BufferGeometry();
+    
+    // Get cylinder index data
+    const cylinderIndices = cylinderGeom.index ? Array.from(cylinderGeom.index.array) : [];
+    if (cylinderIndices.length === 0) {
+        // Generate indices for non-indexed geometry
+        const positionCount = cylinderGeom.attributes.position.count;
+        for (let i = 0; i < positionCount; i += 3) {
+            cylinderIndices.push(i, i + 1, i + 2);
+        }
+    }
+    
+    // Translate cylinder vertices
+    const cylinderPositions = cylinderGeom.attributes.position.array;
+    const translatedCylinderPositions = new Float32Array(cylinderPositions.length);
+    for (let i = 0; i < cylinderPositions.length; i += 3) {
+        translatedCylinderPositions[i] = cylinderPositions[i];
+        translatedCylinderPositions[i + 1] = cylinderPositions[i + 1];
+    // Position cylinder for recess to extend in -Z direction (from 0 to -cylinderHeight)
+    translatedCylinderPositions[i + 2] = cylinderPositions[i + 2] - cylinderHeight / 2;
+    }
+    
+    // Combine positions
+    const totalVertices = cylinderGeom.attributes.position.count + domeGeom.attributes.position.count;
+    const mergedPositions = new Float32Array(totalVertices * 3);
+    
+    // Copy cylinder positions
+    mergedPositions.set(translatedCylinderPositions, 0);
+    
+    // Copy dome positions
+    const cylinderVertexCount = cylinderGeom.attributes.position.count;
+    mergedPositions.set(domePositions, cylinderVertexCount * 3);
+    
+    // Combine UV coordinates if they exist
+    const cylinderUvs = cylinderGeom.attributes.uv;
+    const domeUvs = domeGeom.attributes.uv;
+    
+    if (cylinderUvs || domeUvs) {
+        const mergedUvs = new Float32Array(totalVertices * 2);
+        
+        // Copy cylinder UVs if they exist
+        if (cylinderUvs) {
+            mergedUvs.set(cylinderUvs.array, 0);
+        } else {
+            // Generate default UVs for cylinder if missing
+            const cylinderUvCount = cylinderVertexCount * 2;
+            for (let i = 0; i < cylinderUvCount; i += 2) {
+                mergedUvs[i] = 0.5;
+                mergedUvs[i + 1] = 0.5;
+            }
+        }
+        
+        // Copy dome UVs if they exist
+        if (domeUvs) {
+            mergedUvs.set(domeUvs.array, cylinderVertexCount * 2);
+        } else {
+            // Generate default UVs for dome if missing
+            const domeUvStart = cylinderVertexCount * 2;
+            const domeUvCount = domeGeom.attributes.position.count * 2;
+            for (let i = 0; i < domeUvCount; i += 2) {
+                mergedUvs[domeUvStart + i] = 0.5;
+                mergedUvs[domeUvStart + i + 1] = 0.5;
+            }
+        }
+        
+        mergedGeom.setAttribute('uv', new THREE.BufferAttribute(mergedUvs, 2));
+    }
+    
+    // Combine indices
+    const mergedIndices = [...cylinderIndices];
+    for (const index of newIndices) {
+        mergedIndices.push(index + cylinderVertexCount);
+    }
+    
+    mergedGeom.setAttribute('position', new THREE.BufferAttribute(mergedPositions, 3));
+    mergedGeom.setIndex(mergedIndices);
+    mergedGeom.computeVertexNormals();
+    
+    return { 
+        geometry: mergedGeom, 
+        totalHeight: totalHeight,
+        cylinderRadius: cylinderRadius
+    };
+}
+
 function createDotGeometry(settings) {
     // New cylinder + dome shape parameters
     const cylinderDiameter = toNumber(settings.emboss_dot_cylinder_diameter || settings.emboss_dot_base_diameter, 1.5);
     const cylinderHeight = toNumber(settings.emboss_dot_cylinder_height || settings.emboss_dot_height, 0.1);
     const domeHeight = toNumber(settings.emboss_dot_dome_height || 0.5, 0.5);
-    const radialSegments = 16;
+    const radialSegments = 8; // Reduced for better performance
     
     // Create cylinder base
     const cylinderRadius = Math.max(0, cylinderDiameter / 2);
@@ -48,7 +275,9 @@ function createDotGeometry(settings) {
     
     // Create clipping planes to cut the sphere in half
     const positions = sphereGeom.attributes.position;
+    const uvs = sphereGeom.attributes.uv;
     const newPositions = [];
+    const newUvs = [];
     const newIndices = [];
     const vertices = [];
     
@@ -63,12 +292,22 @@ function createDotGeometry(settings) {
             const scaledZ = (z / sphereRadius) * domeHeight;
             vertices.push({ x, y, z: scaledZ, index: i });
             newPositions.push(x, y, scaledZ);
+            
+            // Transfer UV coordinates if they exist
+            if (uvs) {
+                newUvs.push(uvs.getX(i), uvs.getY(i));
+            }
         }
     }
     
     // Create new geometry for the dome
     const domeGeom = new THREE.BufferGeometry();
     domeGeom.setAttribute('position', new THREE.Float32BufferAttribute(newPositions, 3));
+    
+    // Add UV attribute if it exists in the source
+    if (uvs && newUvs.length > 0) {
+        domeGeom.setAttribute('uv', new THREE.Float32BufferAttribute(newUvs, 2));
+    }
     
     // Rebuild indices for the dome
     const originalIndices = sphereGeom.index.array;
@@ -131,6 +370,42 @@ function createDotGeometry(settings) {
     mergedPositions.set(domeGeom.attributes.position.array, cylinderGeom.attributes.position.count * 3);
     
     mergedGeom.setAttribute('position', new THREE.Float32BufferAttribute(mergedPositions, 3));
+    
+    // Combine UV coordinates if they exist
+    const cylinderUvs = cylinderGeom.attributes.uv;
+    const domeUvs = domeGeom.attributes.uv;
+    
+    if (cylinderUvs || domeUvs) {
+        const mergedUvs = new Float32Array(totalVertices * 2);
+        
+        // Copy cylinder UVs if they exist
+        if (cylinderUvs) {
+            mergedUvs.set(cylinderUvs.array, 0);
+        } else {
+            // Generate default UVs for cylinder if missing
+            const cylinderUvCount = cylinderGeom.attributes.position.count * 2;
+            for (let i = 0; i < cylinderUvCount; i += 2) {
+                mergedUvs[i] = 0.5;
+                mergedUvs[i + 1] = 0.5;
+            }
+        }
+        
+        // Copy dome UVs if they exist
+        const cylinderVertexCount = cylinderGeom.attributes.position.count;
+        if (domeUvs) {
+            mergedUvs.set(domeUvs.array, cylinderVertexCount * 2);
+        } else {
+            // Generate default UVs for dome if missing
+            const domeUvStart = cylinderVertexCount * 2;
+            const domeUvCount = domeGeom.attributes.position.count * 2;
+            for (let i = 0; i < domeUvCount; i += 2) {
+                mergedUvs[domeUvStart + i] = 0.5;
+                mergedUvs[domeUvStart + i + 1] = 0.5;
+            }
+        }
+        
+        mergedGeom.setAttribute('uv', new THREE.BufferAttribute(mergedUvs, 2));
+    }
     
     // Combine indices
     const mergedIndices = [];
@@ -419,6 +694,12 @@ function createRectangleShape(width, height) {
 export function buildCardCounterPlate(settings) {
     const material = new THREE.MeshBasicMaterial();
     const evaluator = new Evaluator();
+    
+    // Performance optimization for CSG operations
+    if (settings.performance_mode) {
+        evaluator.useGroups = false;
+        evaluator.consolidateGroups = false;
+    }
 
     const baseGeometry = createBasePlateGeometry(settings);
     const baseBrush = new Brush(baseGeometry, material);
@@ -443,16 +724,19 @@ export function buildCardCounterPlate(settings) {
     const gridRows = getGridRows(settings);
 
     // Dot recess parameters
-    const cylinderDiameter = toNumber(settings.emboss_dot_cylinder_diameter || settings.emboss_dot_base_diameter, 1.5);
-    const recessOffset = toNumber(settings.counter_plate_dot_size_offset, 0.2);
-    const dotRadius = Math.max(0.3, cylinderDiameter / 2 + recessOffset);
-
     const t = toNumber(settings.card_thickness, 1.6);
     const recessDepth = Math.min(0.8, Math.max(0.2, toNumber(settings.indicator_recess_depth, 0.5)));
+    
+    // Create recess dot geometry with new shape
+    const recessDotResult = createRecessDotGeometry(settings);
+    const recessDotGeometry = recessDotResult.geometry;
+    const recessTotalHeight = recessDotResult.totalHeight;
 
     const subtractBrushes = [];
+    
+    console.log(`Building card counter plate with thickness ${t}mm, recess depth ${recessTotalHeight}mm`);
 
-    // All dot recess spheres
+    // All dot recess shapes
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
         // For counter plate, we allocate full grid regardless of text; recess layout is uniform
         const yPos = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust;
@@ -462,10 +746,12 @@ export function buildCardCounterPlate(settings) {
                 for (let r = 0; r < 3; r++) {
                     const x = xCell + dotColOffsets[c];
                     const y = yPos + dotRowOffsets[r];
-                    const sphere = new THREE.SphereGeometry(dotRadius, 16, 12);
-                    const brush = new Brush(sphere, material);
-                    // Place sphere center slightly below top surface to create recess
-                    brush.position.set(x, y, t - dotRadius * 0.75);
+                    const brush = new Brush(recessDotGeometry.clone(), material);
+                    // Position recess to sink into the surface
+                    // Position recess to start at the top surface and extend downward
+                    // Ensure recess doesn't exceed card thickness
+                    const effectiveRecessDepth = Math.min(recessTotalHeight, t * 0.8); // Max 80% of card thickness
+                    brush.position.set(x, y, t - effectiveRecessDepth);
                     brush.updateMatrixWorld(true);
                     subtractBrushes.push(brush);
                 }
@@ -488,7 +774,8 @@ export function buildCardCounterPlate(settings) {
             const geom = new THREE.ExtrudeGeometry(shape, { depth: recessDepth, bevelEnabled: false });
             const brush = new Brush(geom, material);
             const xCellStart = leftMargin + xAdjust - dotSpacing / 2;
-            brush.position.set(xCellStart, yPos - dotSpacing, t - recessDepth);
+            const effectiveIndicatorDepth = Math.min(recessDepth, t * 0.8); // Max 80% of card thickness
+            brush.position.set(xCellStart, yPos - dotSpacing, t - effectiveIndicatorDepth);
             brush.updateMatrixWorld(true);
             subtractBrushes.push(brush);
         }
@@ -500,12 +787,15 @@ export function buildCardCounterPlate(settings) {
             const brush = new Brush(geom, material);
             const xCellEnd = leftMargin + ((availableColumns + 1) * cellSpacing) + xAdjust;
             const triX = xCellEnd - dotSpacing / 2;
-            brush.position.set(triX, yPos, t - recessDepth);
+            const effectiveIndicatorDepth = Math.min(recessDepth, t * 0.8); // Max 80% of card thickness
+            brush.position.set(triX, yPos, t - effectiveIndicatorDepth);
             brush.updateMatrixWorld(true);
             subtractBrushes.push(brush);
         }
     }
 
+    console.log(`Card counter plate: ${subtractBrushes.length} subtract brushes created`);
+    
     const unionSubtract = balancedUnion(evaluator, subtractBrushes);
     const result = unionSubtract ? evaluator.evaluate(baseBrush, unionSubtract, SUBTRACTION) : baseBrush;
 
@@ -519,10 +809,17 @@ export function buildCardCounterPlate(settings) {
 export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const material = new THREE.MeshBasicMaterial();
     const evaluator = new Evaluator();
+    
+    // Performance optimization for CSG operations
+    if (settings.performance_mode) {
+        evaluator.useGroups = false;
+        evaluator.consolidateGroups = false;
+    }
 
     const diameter = toNumber(cylinderParams.diameter_mm, 31.35);
     const height = toNumber(cylinderParams.height_mm, toNumber(settings.card_height, 54));
     const radius = diameter / 2;
+    const thetaOffset = toNumber(cylinderParams.seam_offset_deg, 355) * Math.PI / 180;
 
     // Base cylinder brush (axis along Z)
     const cylGeometry = new THREE.CylinderGeometry(radius, radius, height, 96, 1, false);
@@ -564,15 +861,14 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const gridRows = getGridRows(settings);
 
     const circumference = Math.PI * diameter;
-    const thetaOffset = toNumber(cylinderParams.seam_offset_deg, 355) * Math.PI / 180;
 
     const zCenterOffset = -height / 2;
     const rowsSpan = (gridRows - 1) * lineSpacing;
 
-    // Dot recess parameters (hemispherical/sub-spherical)
-    const cylinderDiameter = toNumber(settings.emboss_dot_cylinder_diameter || settings.emboss_dot_base_diameter, 1.5);
-    const recessOffset = toNumber(settings.counter_plate_dot_size_offset, 0.2);
-    const dotRadius = Math.max(0.3, cylinderDiameter / 2 + recessOffset);
+    // Create recess dot geometry with new shape
+    const recessDotResult = createRecessDotGeometry(settings);
+    const recessDotGeometry = recessDotResult.geometry;
+    const recessTotalHeight = recessDotResult.totalHeight;
 
     function orientRadial(mesh, theta, zWorld, radialDistance) {
         const rHat = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
@@ -599,15 +895,29 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
             const xCell = leftMargin + ((col + 1) * cellSpacing) + xAdjust;
             const baseTheta = (xCell / circumference) * Math.PI * 2 + thetaOffset;
             const colAngleOffsets = [-(dotSpacing / radius) / 2, (dotSpacing / radius) / 2];
+            
+            // Debug first recess position
+            if (rowIdx === 0 && col === 0) {
+                console.log('First recess position debug:', {
+                    xCell,
+                    baseTheta: baseTheta * 180 / Math.PI,
+                    radius,
+                    recessTotalHeight,
+                    cylinderHeight: recessDotResult.cylinderRadius ? recessDotResult.cylinderRadius * 2 : 'N/A',
+                    geometryInfo: 'Dome flipped to point inward (-Z direction)'
+                });
+            }
+            
             for (let c = 0; c < 2; c++) {
                 const theta = baseTheta + colAngleOffsets[c];
                 for (let r = 0; r < 3; r++) {
-                    const sphere = new THREE.SphereGeometry(dotRadius, 16, 12);
-                    const brush = new Brush(sphere, material);
-                    // Place sphere center slightly inside the cylinder to create recess
-                    const centerRadial = radius - dotRadius * 0.75;
+                    const brush = new Brush(recessDotGeometry.clone(), material);
+                    // The recess geometry now extends from z=0 (opening) to z=-totalHeight
+                    // After orientRadial, +z points radially outward, so the recess extends inward
+                    // Position the opening at the cylinder surface
                     const zDot = zLocal + [dotSpacing, 0, -dotSpacing][r];
-                    orientRadial(brush, theta, zDot, centerRadial);
+                    
+                    orientRadial(brush, theta, zDot, radius);
                     subtractBrushes.push(brush);
                 }
             }
@@ -645,6 +955,11 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
         }
     }
 
+    console.log(`Building cylinder counter plate with ${subtractBrushes.length} subtract brushes`);
+    console.log('Cylinder dimensions:', { diameter, height, radius });
+    console.log('Grid settings:', { availableColumns, gridRows, cellSpacing, lineSpacing, dotSpacing });
+    console.log('Recess total height:', recessTotalHeight, 'mm');
+    
     const unionSubtract = balancedUnion(evaluator, subtractBrushes);
     const result = unionSubtract ? evaluator.evaluate(baseBrush, unionSubtract, SUBTRACTION) : baseBrush;
     const group = new THREE.Group();
