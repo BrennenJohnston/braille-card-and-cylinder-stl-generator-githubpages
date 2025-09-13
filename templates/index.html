@@ -1705,15 +1705,15 @@
                             <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Counter Dot Dimensions</label>
                             <div>
                                 <label for="counter_plate_dot_cylinder_diameter">Counter Dot Cylinder Diameter (mm):</label>
-                                <input type="number" id="counter_plate_dot_cylinder_diameter" name="counter_plate_dot_cylinder_diameter" value="" step="0.1" placeholder="Default: matches emboss cylinder" title="If empty, uses the emboss plate cylinder diameter">
+                                <input type="number" id="counter_plate_dot_cylinder_diameter" name="counter_plate_dot_cylinder_diameter" value="1.5" step="0.1" placeholder="Default: 1.5" title="Recessed dot cylinder base diameter">
                             </div>
                             <div>
                                 <label for="counter_plate_dot_cylinder_height">Counter Dot Cylinder Height (mm):</label>
-                                <input type="number" id="counter_plate_dot_cylinder_height" name="counter_plate_dot_cylinder_height" value="" step="0.01" placeholder="Default: matches emboss cylinder" title="If empty, uses the emboss plate cylinder height">
+                                <input type="number" id="counter_plate_dot_cylinder_height" name="counter_plate_dot_cylinder_height" value="0.1" step="0.01" placeholder="Default: 0.1" title="Recessed dot cylinder height">
                             </div>
                             <div>
                                 <label for="counter_plate_dot_dome_height">Counter Dot Dome Height (mm):</label>
-                                <input type="number" id="counter_plate_dot_dome_height" name="counter_plate_dot_dome_height" value="" step="0.1" placeholder="Default: matches emboss dome" title="If empty, uses the emboss plate dome height">
+                                <input type="number" id="counter_plate_dot_dome_height" name="counter_plate_dot_dome_height" value="0.5" step="0.1" placeholder="Default: 0.5" title="Recessed dot dome height">
                             </div>
                             <div style="margin-top: 10px;">
                                 <label for="counter_plate_dot_size_offset">Counter Dot Diameter Offset (mm):</label>
@@ -1784,6 +1784,23 @@
                             <div>
                                 <label for="braille_x_adjust">X Adjust:</label>
                                 <input type="number" id="braille_x_adjust" name="braille_x_adjust" value="0.0" step="0.1">
+                            </div>
+                        </div>
+
+                        <div class="grade-selection">
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Debug Mode</label>
+                            <div style="margin-top: 10px;">
+                                <label>
+                                    <input type="checkbox" id="debug_triangle_only" name="debug_triangle_only" style="margin-right: 5px;">
+                                    Show only triangle indicator shapes (for debugging)
+                                </label>
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <label for="indicator_recess_depth">Indicator Recess Depth (mm):</label>
+                                <input type="number" id="indicator_recess_depth" name="indicator_recess_depth" value="0.5" step="0.1" min="0.1" max="2.0">
+                                <div class="grade-note" style="margin-top: 4px; font-size: 0.85em;">
+                                    Controls the depth of triangle and rectangle indicator recesses
+                                </div>
                             </div>
                         </div>
                         
@@ -2518,7 +2535,8 @@
                 'card_height',
                 'card_thickness',
                 'braille_x_adjust',
-                'braille_y_adjust'
+                'braille_y_adjust',
+                'indicator_recess_depth'
             ];
             
             expertInputs.forEach(inputId => {
@@ -2527,6 +2545,18 @@
                     input.addEventListener('input', resetToGenerateState);
                 }
             });
+            
+            // Debug mode controls
+            const debugTriangleOnly = document.getElementById('debug_triangle_only');
+            if (debugTriangleOnly) {
+                debugTriangleOnly.addEventListener('change', function() {
+                    resetToGenerateState();
+                    console.log('Debug triangle mode enabled:', this.checked);
+                    if (this.checked) {
+                        console.log('Triangle debug mode: Only triangle indicator shapes will be generated.');
+                    }
+                });
+            }
             
             // Cylinder parameter inputs
             const cylinderInputs = [
@@ -2973,6 +3003,8 @@
                 counter_plate_dot_dome_height: document.getElementById('counter_plate_dot_dome_height').value,
                 counter_plate_dot_size_offset: document.getElementById('counter_plate_dot_size_offset').value,
                 performance_mode: document.getElementById('performance_mode').checked,
+                debug_triangle_only: document.getElementById('debug_triangle_only').checked,
+                indicator_recess_depth: document.getElementById('indicator_recess_depth').value,
                 card_width: document.getElementById('card_width').value,
                 card_height: document.getElementById('card_height').value,
                 card_thickness: document.getElementById('card_thickness').value,
