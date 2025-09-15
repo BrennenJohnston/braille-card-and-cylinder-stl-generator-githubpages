@@ -129,63 +129,92 @@ def create_braille_mesh_from_unicode_lines(lines):
 def _create_triangle_marker_prism(x_center: float, y_center: float, height: float = 0.6, for_subtraction: bool = True) -> trimesh.Trimesh | None:
     """Create a triangular prism used as a recessed indicator (apex pointing right).
 
-    Geometry matches upstream orientation logic for card plates.
-    - Base vertical span: 2 * DOT_SPACING
-    - Horizontal reach: DOT_SPACING (from left column toward center/right)
-    The prism is positioned to start slightly above top surface and extends downward when for_subtraction.
+    This matches the working upstream implementation:
+    - Base vertical span: 2 * DOT_SPACING (distance between top and bottom dots)
+    - Horizontal reach: DOT_SPACING (extends to middle-right dot position)
+    - Base positioned at left column, apex pointing toward right column
     """
     if Polygon is None:
         return None
 
-    base_height = 2 * DOT_SPACING
-    triangle_width = DOT_SPACING
+    # Triangle dimensions (match upstream exactly)
+    base_height = 2 * DOT_SPACING  # Vertical extent
+    triangle_width = DOT_SPACING   # Horizontal extent
 
-    # Base along the left column of the cell; apex points toward the right column
-    base_x = x_center - DOT_SPACING / 2.0
+    # Triangle vertices: base on left, apex pointing right
+    # Base is centered between top and bottom dots
+    base_x = x_center - DOT_SPACING / 2.0  # Left column position
+    
     vertices = [
-        (base_x, y_center - DOT_SPACING),
-        (base_x, y_center + DOT_SPACING),
-        (base_x + triangle_width, y_center),
+        (base_x, y_center - DOT_SPACING),      # Bottom of base
+        (base_x, y_center + DOT_SPACING),      # Top of base  
+        (base_x + triangle_width, y_center)    # Apex (at middle-right dot height)
     ]
 
+    # Create 2D polygon using Shapely
     tri_2d = Polygon(vertices)
-    extrude_height = (height + 0.5) if for_subtraction else height
-    tri_prism = trimesh.creation.extrude_polygon(tri_2d, height=extrude_height)
-
-    # Place at/into the top surface
-    z_pos = CARD_THICKNESS - 0.1 if for_subtraction else CARD_THICKNESS
-    tri_prism.apply_translation([0.0, 0.0, z_pos])
+    
+    if for_subtraction:
+        # For counter plate recesses, extrude downward from top surface
+        extrude_height = height + 0.5  # Extra depth to ensure clean boolean
+        tri_prism = trimesh.creation.extrude_polygon(tri_2d, height=extrude_height)
+        
+        # Position at the top surface of the card
+        z_pos = CARD_THICKNESS - 0.1  # Start slightly above surface
+        tri_prism.apply_translation([0.0, 0.0, z_pos])
+    else:
+        # For embossing plate, extrude upward from top surface
+        tri_prism = trimesh.creation.extrude_polygon(tri_2d, height=height)
+        
+        # Position on top of the card base
+        z_pos = CARD_THICKNESS
+        tri_prism.apply_translation([0.0, 0.0, z_pos])
+    
     return tri_prism
 
 
 def _create_line_end_marker_prism(x_center: float, y_center: float, height: float = 0.5, for_subtraction: bool = True) -> trimesh.Trimesh | None:
     """Create a rectangular prism used as a recessed line-end indicator.
 
-    Geometry matches upstream orientation logic for card plates.
-    - Vertical span: 2 * DOT_SPACING
-    - Horizontal width: DOT_SPACING centered on right column of the cell
-    The prism is positioned to start slightly above top surface and extends downward when for_subtraction.
+    This matches the working upstream implementation:
+    - Vertical span: 2 * DOT_SPACING (distance between top and bottom dots)
+    - Horizontal width: DOT_SPACING centered on the cell
+    - Positioned at the start of each row for line-end marking
     """
     if Polygon is None:
         return None
 
-    line_height = 2 * DOT_SPACING
-    line_width = DOT_SPACING
-    line_x = x_center + DOT_SPACING / 2.0
+    # Line dimensions (match upstream exactly)
+    line_height = 2 * DOT_SPACING  # Vertical extent
+    line_width = DOT_SPACING       # Horizontal width
 
+    # Rectangle vertices: centered on the cell
     vertices = [
-        (line_x - line_width/2.0, y_center - DOT_SPACING),
-        (line_x + line_width/2.0, y_center - DOT_SPACING),
-        (line_x + line_width/2.0, y_center + DOT_SPACING),
-        (line_x - line_width/2.0, y_center + DOT_SPACING),
+        (x_center - line_width/2.0, y_center - DOT_SPACING),  # Bottom left
+        (x_center + line_width/2.0, y_center - DOT_SPACING),  # Bottom right
+        (x_center + line_width/2.0, y_center + DOT_SPACING),  # Top right
+        (x_center - line_width/2.0, y_center + DOT_SPACING),  # Top left
     ]
 
+    # Create 2D polygon using Shapely
     rect_2d = Polygon(vertices)
-    extrude_height = (height + 0.5) if for_subtraction else height
-    rect_prism = trimesh.creation.extrude_polygon(rect_2d, height=extrude_height)
-
-    z_pos = CARD_THICKNESS - 0.1 if for_subtraction else CARD_THICKNESS
-    rect_prism.apply_translation([0.0, 0.0, z_pos])
+    
+    if for_subtraction:
+        # For counter plate recesses, extrude downward from top surface
+        extrude_height = height + 0.5  # Extra depth to ensure clean boolean
+        rect_prism = trimesh.creation.extrude_polygon(rect_2d, height=extrude_height)
+        
+        # Position at the top surface of the card
+        z_pos = CARD_THICKNESS - 0.1  # Start slightly above surface
+        rect_prism.apply_translation([0.0, 0.0, z_pos])
+    else:
+        # For embossing plate, extrude upward from top surface
+        rect_prism = trimesh.creation.extrude_polygon(rect_2d, height=height)
+        
+        # Position on top of the card base
+        z_pos = CARD_THICKNESS
+        rect_prism.apply_translation([0.0, 0.0, z_pos])
+    
     return rect_prism
 
 
@@ -199,91 +228,116 @@ def _create_hemisphere_sphere(dot_x: float, dot_y: float, radius: float) -> trim
 def build_counter_plate_with_hemispheres() -> trimesh.Trimesh:
     """Create a counter plate with hemispherical recesses and recessed indicator markers.
 
-    Orientation and positioning mirror the working upstream implementation:
-    - Reserve first and last columns for indicators (line at first, triangle at last)
-    - Recess all indicators (boolean subtraction into the plate)
-    - Create hemispherical recesses for all six dots in every text cell
+    This implementation follows the working upstream approach:
+    - Create simple icospheres (hemispheres) for all dot positions
+    - Use proper grid layout with reserved columns for indicators
+    - Position hemispheres with equator at surface level
+    - Create recessed triangle and line markers using proper orientation
     """
     # Base plate
     plate = trimesh.creation.box(extents=(CARD_WIDTH, CARD_HEIGHT, CARD_THICKNESS))
     plate.apply_translation((CARD_WIDTH/2.0, CARD_HEIGHT/2.0, CARD_THICKNESS/2.0))
 
-    # Grid dimensions
+    # Grid dimensions - reserve first and last columns for indicators
     grid_columns_total = CHARS_PER_LINE + 2  # reserve first/last for indicators
     grid_rows = MAX_LINES
 
-    # Offsets within a cell (match upstream mapping)
+    # Dot positioning constants (match upstream)
     dot_col_offsets = [-DOT_SPACING / 2.0, DOT_SPACING / 2.0]
     dot_row_offsets = [DOT_SPACING, 0.0, -DOT_SPACING]
     dot_positions = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)]
 
-    # Build hemispheres for all dots of all TEXT cells (skip first/last indicator columns)
-    spheres = []
+    # Hemisphere radius - use dot spacing/2 for proper recess size
+    hemisphere_radius = DOT_SPACING / 2.0
+
+    # Create icospheres (hemispheres) for all dot positions
+    sphere_meshes = []
     for row_idx in range(grid_rows):
-        # Match local dot placement to compute row center
-        y_offset = CARD_HEIGHT - TOP_MARGIN - CELL_HEIGHT - (row_idx * (CELL_HEIGHT + LINE_SPACING))
-        y_center = y_offset + 1.5 * DOT_SPACING
+        # Calculate Y position for this row (match upstream positioning)
+        y_pos = CARD_HEIGHT - TOP_MARGIN - (row_idx * (CELL_HEIGHT + LINE_SPACING))
 
-        for col_idx in range(1, grid_columns_total - 1):  # skip 0 and last (indicators)
-            x_center = LEFT_MARGIN + col_idx * CELL_WIDTH + DOT_SPACING
+        # Process text columns (skip first and last indicator columns)
+        for col_idx in range(1, grid_columns_total - 1):
+            # Calculate X position for this column
+            x_pos = LEFT_MARGIN + col_idx * CELL_WIDTH + DOT_SPACING
 
-            for (r, c) in dot_positions:
-                dot_x = x_center + dot_col_offsets[c]
-                dot_y = y_center + dot_row_offsets[r]
-                spheres.append(_create_hemisphere_sphere(dot_x, dot_y, radius=DOT_SPACING/2.0))
+            # Create hemispheres for all 6 dots in this cell
+            for dot_idx in range(6):
+                dot_pos = dot_positions[dot_idx]
+                dot_x = x_pos + dot_col_offsets[dot_pos[1]]
+                dot_y = y_pos + dot_row_offsets[dot_pos[0]]
 
-    # Indicator markers: line at first column, triangle at last column (recessed)
+                # Create icosphere with proper radius
+                sphere = trimesh.creation.icosphere(subdivisions=2, radius=hemisphere_radius)
+                # Position so equator lies at top surface (z = CARD_THICKNESS)
+                sphere.apply_translation((dot_x, dot_y, CARD_THICKNESS))
+                sphere_meshes.append(sphere)
+
+    # Create recessed indicator markers for all rows
     line_markers = []
     triangle_markers = []
     for row_idx in range(grid_rows):
-        y_offset = CARD_HEIGHT - TOP_MARGIN - CELL_HEIGHT - (row_idx * (CELL_HEIGHT + LINE_SPACING))
-        y_center = y_offset + 1.5 * DOT_SPACING
+        y_pos = CARD_HEIGHT - TOP_MARGIN - (row_idx * (CELL_HEIGHT + LINE_SPACING))
 
-        x_first_center = LEFT_MARGIN + 0 * CELL_WIDTH + DOT_SPACING
-        x_last_center = LEFT_MARGIN + (grid_columns_total - 1) * CELL_WIDTH + DOT_SPACING
-
-        line_mesh = _create_line_end_marker_prism(x_first_center, y_center, height=0.5, for_subtraction=True)
-        tri_mesh = _create_triangle_marker_prism(x_last_center, y_center, height=0.5, for_subtraction=True)
+        # Line marker at first column (left side)
+        x_first = LEFT_MARGIN + DOT_SPACING
+        line_mesh = _create_line_end_marker_prism(x_first, y_pos, height=0.5, for_subtraction=True)
         if line_mesh is not None:
             line_markers.append(line_mesh)
+
+        # Triangle marker at last column (right side)
+        x_last = LEFT_MARGIN + (grid_columns_total - 1) * CELL_WIDTH + DOT_SPACING
+        tri_mesh = _create_triangle_marker_prism(x_last, y_pos, height=0.5, for_subtraction=True)
         if tri_mesh is not None:
             triangle_markers.append(tri_mesh)
 
-    # If boolean ops fail, return plate only instead of crashing
-    try:
-        # Union spheres for efficient subtraction
-        if len(spheres) == 0:
-            union_spheres = None
-        elif len(spheres) == 1:
-            union_spheres = spheres[0]
-        else:
-            union_spheres = trimesh.boolean.union(spheres, engine=None)
+    # Perform boolean operations - try multiple engines for robustness
+    engines_to_try = [None]  # Use trimesh default engine
+    
+    for engine in engines_to_try:
+        try:
+            # Union all spheres for efficient subtraction
+            if len(sphere_meshes) == 0:
+                union_spheres = None
+            elif len(sphere_meshes) == 1:
+                union_spheres = sphere_meshes[0]
+            else:
+                union_spheres = trimesh.boolean.union(sphere_meshes, engine=engine)
 
-        # Union markers
-        union_lines = None
-        if line_markers:
-            union_lines = line_markers[0] if len(line_markers) == 1 else trimesh.boolean.union(line_markers, engine=None)
-        union_tris = None
-        if triangle_markers:
-            union_tris = triangle_markers[0] if len(triangle_markers) == 1 else trimesh.boolean.union(triangle_markers, engine=None)
+            # Union all markers
+            union_lines = None
+            if line_markers:
+                union_lines = line_markers[0] if len(line_markers) == 1 else trimesh.boolean.union(line_markers, engine=engine)
+            
+            union_tris = None
+            if triangle_markers:
+                union_tris = triangle_markers[0] if len(triangle_markers) == 1 else trimesh.boolean.union(triangle_markers, engine=engine)
 
-        # Combine all cutouts
-        cutouts = []
-        if union_spheres is not None:
-            cutouts.append(union_spheres)
-        if union_lines is not None:
-            cutouts.append(union_lines)
-        if union_tris is not None:
-            cutouts.append(union_tris)
+            # Combine all cutouts for subtraction
+            cutouts = []
+            if union_spheres is not None:
+                cutouts.append(union_spheres)
+            if union_lines is not None:
+                cutouts.append(union_lines)
+            if union_tris is not None:
+                cutouts.append(union_tris)
 
-        if cutouts:
-            all_cutouts = cutouts[0] if len(cutouts) == 1 else trimesh.boolean.union(cutouts, engine=None)
-            result = trimesh.boolean.difference(plate, all_cutouts, engine=None)
-            return result if isinstance(result, trimesh.Trimesh) else plate
-        else:
+            if cutouts:
+                all_cutouts = cutouts[0] if len(cutouts) == 1 else trimesh.boolean.union(cutouts, engine=engine)
+                result = trimesh.boolean.difference(plate, all_cutouts, engine=engine)
+                if isinstance(result, trimesh.Trimesh):
+                    return result
+            
+            # If we reach here, the engine worked but no cutouts were processed
             return plate
-    except Exception:
-        return plate
+            
+        except Exception as e:
+            print(f"Boolean operation failed with engine {engine}: {e}")
+            continue
+    
+    # If all engines failed, return base plate
+    print("Warning: All boolean engines failed, returning base plate")
+    return plate
 
 @app.route('/')
 def index():

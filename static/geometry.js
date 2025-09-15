@@ -135,147 +135,47 @@ function createSphericalCapForRecess(baseRadius, recessDepth) {
 }
 
 function createRecessDotGeometry(settings) {
-    // Creates a compound recess: cylinder + spherical cap at bottom
-    // When used in CSG subtraction, this creates a cylindrical recess with dome-shaped bottom
+    // Creates simple hemispherical recesses using icospheres
+    // This matches the working upstream implementation approach
     
     // Counter plate recess parameters
     const embossCylinderDiameter = toNumber(settings.emboss_dot_cylinder_diameter || settings.emboss_dot_base_diameter, 1.5);
-    const embossCylinderHeight = toNumber(settings.emboss_dot_cylinder_height || settings.emboss_dot_height, 0.1);
-    const embossDomeHeight = toNumber(settings.emboss_dot_dome_height || 0.5, 0.5);
     const offset = toNumber(settings.counter_plate_dot_size_offset, 0.0);
-    
-    // Get the actual cylinder and dome heights that will be used
-    const actualCylinderHeight = settings.counter_plate_dot_cylinder_height && settings.counter_plate_dot_cylinder_height.trim() !== ''
-        ? toNumber(settings.counter_plate_dot_cylinder_height, embossCylinderHeight)
-        : embossCylinderHeight;
-        
-    const actualDomeHeight = settings.counter_plate_dot_dome_height && settings.counter_plate_dot_dome_height.trim() !== ''
-        ? toNumber(settings.counter_plate_dot_dome_height, embossDomeHeight)
-        : embossDomeHeight;
-    
-    // Performance optimization: use simple geometry if performance mode is enabled or dome height is very small
-    const useSimpleGeometry = settings.performance_mode || actualDomeHeight < 0.1;
-    
-    if (settings.performance_mode) {
-        console.log('Performance mode enabled - using simple cylinder without spherical cap');
-    }
-    if (actualDomeHeight < 0.1 && !settings.performance_mode) {
-        console.log('Recess depth too small (<0.1) - using simple cylinder');
-    }
     
     // Use counter plate specific parameters if provided
     const openingDiameter = settings.counter_plate_dot_cylinder_diameter && settings.counter_plate_dot_cylinder_diameter.trim() !== '' 
         ? toNumber(settings.counter_plate_dot_cylinder_diameter, embossCylinderDiameter + offset)
         : embossCylinderDiameter + offset;
     
-    const cylinderDepth = actualCylinderHeight;
-    const domeDepth = actualDomeHeight;
     const baseRadius = openingDiameter / 2;
-    const totalDepth = cylinderDepth + domeDepth;
     
-    // Debug logging
-    console.log('Counter plate compound recess dimensions:', {
-        openingDiameter,
-        baseRadius,
-        cylinderDepth,
-        domeDepth,
-        totalDepth,
-        offset,
-        embossCylinderDiameter,
-        embossCylinderHeight,
-        embossDomeHeight,
-        useSimpleGeometry,
-        geometryType: useSimpleGeometry ? 'SIMPLE CYLINDER' : 'COMPOUND (CYLINDER + SPHERICAL CAP)',
-        shapeDescription: 'Creates a cylindrical recess with dome-shaped bottom',
-        settings: {
-            counter_plate_dot_cylinder_diameter: settings.counter_plate_dot_cylinder_diameter,
-            counter_plate_dot_cylinder_height: settings.counter_plate_dot_cylinder_height,
-            counter_plate_dot_dome_height: settings.counter_plate_dot_dome_height,
-            performance_mode: settings.performance_mode
-        }
-    });
-    
-    if (useSimpleGeometry) {
-        // Simple cylinder for better performance (no dome bottom)
-        // Calculate appropriate segments for manifold geometry
-        const circumference = 2 * Math.PI * baseRadius;
-        const targetResolution = 0.15; // mm
-        const radialSegments = Math.max(12, Math.min(48, Math.round(circumference / targetResolution)));
-        
-        const cylinderGeom = new THREE.CylinderGeometry(baseRadius, baseRadius, totalDepth, radialSegments, 1, false);
-        // Rotate from Y-axis to Z-axis
-        cylinderGeom.rotateX(Math.PI / 2);
-        
-        // Translate to extend from 0 to -totalDepth
-        const positions = cylinderGeom.attributes.position.array;
-        for (let i = 0; i < positions.length; i += 3) {
-            positions[i + 2] -= totalDepth / 2;
-        }
-        cylinderGeom.attributes.position.needsUpdate = true;
-        
-        return { 
-            geometry: cylinderGeom, 
-            totalHeight: totalDepth,
-            cylinderRadius: baseRadius,
-            sphereRadius: null,
-            centerOffset: null,
-            cylinderHeight: cylinderDepth
-        };
-    }
-    
-    // Build a closed recess: cylinder section + spherical cap bottom, then union them
-    // This avoids open surfaces that can cause CSG to no-op
+    // Create simple icosphere (hemisphere) - much more reliable than compound geometry
+    // Calculate appropriate resolution for manifold geometry
     const circumference = 2 * Math.PI * baseRadius;
     const targetResolution = 0.15; // mm
-    const radialSegments = Math.max(16, Math.min(48, Math.round(circumference / targetResolution)));
-
-    // Cylinder part: spans z in [-cylinderDepth, 0]
-    const cylPart = new THREE.CylinderGeometry(baseRadius, baseRadius, cylinderDepth, radialSegments, 1, false);
-    cylPart.rotateX(Math.PI / 2);
-    {
-        const p = cylPart.attributes.position.array;
-        for (let i = 0; i < p.length; i += 3) {
-            p[i + 2] -= cylinderDepth / 2; // shift so top is at z=0
-        }
-        cylPart.attributes.position.needsUpdate = true;
-    }
-
-    // Dome part: spherical cap with depth = domeDepth, then shift down so its rim meets the cylinder bottom at z=-cylinderDepth
-    const sphericalCap = createSphericalCapForRecess(baseRadius, domeDepth);
-    const capPart = sphericalCap.geometry;
-    {
-        const p = capPart.attributes.position.array;
-        for (let i = 0; i < p.length; i += 3) {
-            p[i + 2] -= cylinderDepth; // place cap immediately below cylinder segment
-        }
-        capPart.attributes.position.needsUpdate = true;
-    }
-
-    // Union via CSG to ensure a single closed manifold recess shape
-    const tmpMaterial = new THREE.MeshBasicMaterial();
-    const evaluatorLocal = new Evaluator();
-    const cylBrush = new Brush(cylPart, tmpMaterial);
-    const capBrush = new Brush(capPart, tmpMaterial);
-    cylBrush.updateMatrixWorld(true);
-    capBrush.updateMatrixWorld(true);
-    const united = evaluatorLocal.evaluate(cylBrush, capBrush, ADDITION);
-    const unitedGeometry = united.geometry;
-
-    console.log('Creating compound recess geometry (cylinder + spherical cap):', {
-        openingDiameter: baseRadius * 2,
-        cylinderDepth,
-        domeDepth,
-        totalDepth,
-        radialSegments
+    const radialSegments = Math.max(12, Math.min(48, Math.round(circumference / targetResolution)));
+    
+    // Create icosphere that will be positioned with equator at surface level
+    const sphereGeom = new THREE.SphereGeometry(baseRadius, radialSegments, radialSegments);
+    
+    console.log('Counter plate hemispherical recess dimensions:', {
+        openingDiameter,
+        baseRadius,
+        circumference,
+        radialSegments,
+        actualResolution: circumference / radialSegments,
+        targetResolution: targetResolution,
+        geometryType: 'ICOSPHERE (HEMISPHERE)',
+        shapeDescription: 'Simple icosphere positioned with equator at surface for clean subtraction'
     });
-
-    return {
-        geometry: unitedGeometry,
-        totalHeight: totalDepth,
+    
+    return { 
+        geometry: sphereGeom, 
+        totalHeight: baseRadius, // Hemisphere height is just the radius
         cylinderRadius: baseRadius,
-        sphereRadius: sphericalCap.radius,
+        sphereRadius: baseRadius,
         centerOffset: 0,
-        cylinderHeight: cylinderDepth
+        cylinderHeight: 0 // No cylinder part in simple hemisphere
     };
 }
 
@@ -790,11 +690,12 @@ function balancedUnion(evaluator, brushes) {
 
 function createTriangleShape(baseHeight, triangleWidth) {
     const shape = new THREE.Shape();
-    // Create triangle as user described: base along Z-axis, apex at X
-    // In THREE.js Shape coordinates: use Y for base (will map to Z), X for apex direction
-    const p1 = { x: 0, y: -baseHeight / 2 };        // Base bottom
-    const p2 = { x: 0, y: baseHeight / 2 };         // Base top  
-    const p3 = { x: triangleWidth, y: 0 };          // Apex pointing in +X direction
+    // Create triangle matching upstream implementation:
+    // Base is vertical (along Y-axis), apex points horizontally (along X-axis)
+    // This creates the correct orientation for both card and cylinder plates
+    const p1 = { x: -triangleWidth / 2, y: -baseHeight / 2 };  // Base bottom left
+    const p2 = { x: -triangleWidth / 2, y: baseHeight / 2 };   // Base top left  
+    const p3 = { x: triangleWidth / 2, y: 0 };                 // Apex pointing right
     
     shape.moveTo(p1.x, p1.y);
     shape.lineTo(p2.x, p2.y);
@@ -802,12 +703,12 @@ function createTriangleShape(baseHeight, triangleWidth) {
     shape.closePath();
     
     // Debug logging for triangle shape creation
-    console.log('createTriangleShape (corrected):', {
+    console.log('createTriangleShape (upstream corrected):', {
         baseHeight,
         triangleWidth,
         vertices: [p1, p2, p3],
-        description: 'Triangle with base along Y-axis (maps to cylinder Z-axis), apex pointing in +X direction (maps to cylinder tangent)',
-        coordinateSystem: 'Shape: Y=base direction, X=apex direction, Z=extrude direction'
+        description: 'Triangle with base along Y-axis (vertical), apex pointing in +X direction (horizontal right)',
+        coordinateSystem: 'Shape: Y=vertical (base), X=horizontal (apex), Z=extrude direction'
     });
     
     return shape;
@@ -902,10 +803,9 @@ export function buildCardCounterPlate(settings) {
                         const x = xCell + dotColOffsets[c];
                         const y = yPos + dotRowOffsets[r];
                         const brush = dotBrush.clone();
-                        // Slight z-inset to avoid coplanar surface with card top during CSG
-                        const csgInset = Math.min(0.02, recessTotalHeight * 0.05);
-                        const sphereCenterZ = t + recessDotResult.centerOffset - csgInset;
-                        brush.position.set(x, y, sphereCenterZ);
+                        // Position hemisphere with equator at surface level (z = t)
+                        // This matches the upstream implementation
+                        brush.position.set(x, y, t);
                         brush.updateMatrixWorld(true);
                         subtractBrushes.push(brush);
                     }
@@ -1139,13 +1039,13 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
                 const theta = baseTheta + colAngleOffsets[c];
                 for (let r = 0; r < 3; r++) {
                     const brush = dotBrush.clone();
-                    // LatheGeometry is positioned with top at Z=0
+                    // Position hemisphere with equator at cylinder surface
                     const zDot = zLocal + [dotSpacing, 0, -dotSpacing][r];
                     
-                    // Slightly inset to avoid exact coplanar rim issues in CSG
-                    const csgInset = Math.min(0.02, recessTotalHeight * 0.05);
-                    orientRadial(brush, theta, zDot, radius - csgInset);
-                        subtractBrushes.push(brush);
+                    // Orient hemisphere radially outward from cylinder surface
+                    // This matches the upstream implementation approach
+                    orientRadial(brush, theta, zDot, radius);
+                    subtractBrushes.push(brush);
                     }
                 }
             }
