@@ -1825,12 +1825,30 @@
 
     
     <!-- Load the real liblouis JavaScript implementation from static files -->
-    <script src="../static/liblouis/build-no-tables-utf16.js"></script>
-    <script src="../static/liblouis/easy-api.js"></script>
+    <script src="../static/liblouis/build-no-tables-utf16.js?v=2025-09-15"></script>
+    <script src="../static/liblouis/easy-api.js?v=2025-09-15"></script>
     <!-- Runtime config for GitHub Pages / external backend -->
-    <script src="../static/app-config.js"></script>
+    <script src="../static/app-config.js?v=2025-09-15"></script>
     
     <script type="module">
+        // Gate dev-only controls behind ?dev
+        const DEV = new URLSearchParams(location.search).has('dev');
+        if (!DEV) {
+            try {
+                // Hide Debug Mode group
+                const debugCheckbox = document.getElementById('debug_triangle_only');
+                if (debugCheckbox) {
+                    const debugContainer = debugCheckbox.closest('.grade-selection');
+                    if (debugContainer) debugContainer.style.display = 'none';
+                }
+                // Hide Performance Mode checkbox section
+                const perfEl = document.getElementById('performance_mode');
+                if (perfEl) {
+                    const perfContainer = perfEl.closest('.grade-selection') || perfEl.parentElement;
+                    if (perfContainer) perfContainer.style.display = 'none';
+                }
+            } catch (_) {}
+        }
         import * as THREE from 'three';
         import { STLLoader } from '../static/STLLoader.js';
         import { OrbitControls } from '../static/OrbitControls.js';
