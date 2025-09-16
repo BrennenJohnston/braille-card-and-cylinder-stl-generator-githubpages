@@ -121,7 +121,7 @@ appRoot.innerHTML = `
                 <div class="param-input">
                   <label>Number of Braille Cells (Characters)</label>
                   <input type="number" id="grid-columns" value="14" step="1" min="8" max="30">
-                  <div class="section-note">2 cells reserved for row indicators... 12 cells available.</div>
+                  <div class="section-note" id="grid-columns-note">2 cells reserved for row indicators • 12 cells available.</div>
                 </div>
                 <div class="param-input">
                   <label>Number of Braille Lines</label>
@@ -296,8 +296,18 @@ class Braille3DStudio {
     this.messageSeq = 1;
     this.grade = 'g2'; // g1 or g2
     this.serverStlBlob = null;
+    this.csgLoaded = false;
+    this.geometryModule = null;
 
     this.settings = this.getDefaultSettings();
+    // Restore persisted preferences
+    try {
+      const saved = localStorage.getItem('braille3d_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        this.settings = { ...this.settings, ...parsed };
+      }
+    } catch {}
     this.init();
   }
 
@@ -344,6 +354,30 @@ class Braille3DStudio {
     }, 500);
   }
 
+  async ensureCsgAndGeometryModule() {
+    if (!this.csgLoaded) {
+      try {
+        if (!window.ThreeBvhCsg) {
+          // Load CSG library as ESM from CDN
+          const mod = await import('https://cdn.jsdelivr.net/npm/three-bvh-csg@0.5.23/build/index.module.js');
+          window.ThreeBvhCsg = mod;
+        }
+        this.csgLoaded = !!window.ThreeBvhCsg;
+      } catch (e) {
+        console.warn('Failed to load three-bvh-csg from CDN; counter plate recesses unavailable', e);
+        this.csgLoaded = false;
+      }
+    }
+    if (!this.geometryModule) {
+      try {
+        this.geometryModule = await import('../static/geometry.js');
+      } catch (e) {
+        console.warn('Failed to load geometry module; falling back to simple geometry', e);
+        this.geometryModule = null;
+      }
+    }
+  }
+
   setupEventListeners() {
     // Top chrome controls
     const updateFontUi = () => {
@@ -388,6 +422,7 @@ class Braille3DStudio {
         e.target.classList.add('active');
         this.currentShape = e.target.dataset.shape;
         this.updateShapeParams();
+        this.persistSettings();
       });
     });
 
@@ -396,6 +431,8 @@ class Braille3DStudio {
         document.querySelectorAll('.plate-btn').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         this.currentPlate = e.target.dataset.plate;
+        this.persistSettings();
+        this.updateGridColumnsNote();
       });
     });
 
@@ -438,11 +475,11 @@ class Braille3DStudio {
 
     Object.entries(paramMap).forEach(([id, key]) => {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('change', e => { this.settings[key] = parseFloat(e.target.value); this.updateComputedSettings(); });
+      if (el) el.addEventListener('change', e => { this.settings[key] = parseFloat(e.target.value); this.updateComputedSettings(); this.updateGridColumnsNote(); this.persistSettings(); });
     });
 
-    document.getElementById('use-bowl')?.addEventListener('change', e => { this.settings.use_bowl_recess = e.target.checked ? 1 : 0; });
-    document.getElementById('indicator-shapes')?.addEventListener('change', e => { this.settings.indicator_shapes = e.target.checked ? 1 : 0; });
+    document.getElementById('use-bowl')?.addEventListener('change', e => { this.settings.use_bowl_recess = e.target.checked ? 1 : 0; this.persistSettings(); });
+    document.getElementById('indicator-shapes')?.addEventListener('change', e => { this.settings.indicator_shapes = e.target.checked ? 1 : 0; this.persistSettings(); });
 
     // Cylinder warning on seam change
     const seamEl = document.getElementById('seam-offset');
@@ -458,15 +495,40 @@ class Braille3DStudio {
     if (this.currentShape === 'card') { cardParams.forEach(el => el.style.display = 'block'); cylinderParams.forEach(el => el.style.display = 'none'); }
     else { cardParams.forEach(el => el.style.display = 'none'); cylinderParams.forEach(el => el.style.display = 'block'); }
     this.updateComputedSettings();
+    this.applyCameraUpForCurrentShape();
+    this.updateGridColumnsNote();
   }
 
   updateComputedSettings() {
-    const gridWidth = (this.settings.grid_columns - 1) * this.settings.cell_spacing;
-    const gridHeight = (this.settings.grid_rows - 1) * this.settings.line_spacing;
+    const gridWidth = (this.settings.grid_columns) * this.settings.cell_spacing;
+    const gridHeight = (this.settings.grid_rows) * this.settings.line_spacing;
     this.settings.left_margin = (this.settings.card_width - gridWidth) / 2;
     this.settings.right_margin = (this.settings.card_width - gridWidth) / 2;
     this.settings.top_margin = (this.settings.card_height - gridHeight) / 2;
     this.settings.bottom_margin = (this.settings.card_height - gridHeight) / 2;
+    this.persistSettings();
+  }
+
+  recreateControls() {
+    if (this.controls) this.controls.dispose();
+    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.05;
+    this.controls.autoRotate = this.autoRotate;
+    this.controls.autoRotateSpeed = 2.0;
+  }
+
+  applyCameraUpForCurrentShape() {
+    if (!this.camera) return;
+    if (this.currentShape === 'cylinder') {
+      this.camera.up.set(0, 0, 1);
+      this.camera.position.set(120, 0, 0);
+    } else {
+      this.camera.up.set(0, 1, 0);
+      this.camera.position.set(100, 100, 150);
+    }
+    this.camera.lookAt(0, 0, 0);
+    this.recreateControls();
   }
 
   initThreeJS() {
@@ -481,11 +543,7 @@ class Braille3DStudio {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
-    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-    this.controls.autoRotate = false;
-    this.controls.autoRotateSpeed = 2.0;
+    this.recreateControls();
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); this.scene.add(ambientLight);
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(50, 100, 50);
@@ -559,8 +617,7 @@ class Braille3DStudio {
   }
 
   resetView() {
-    this.camera.position.set(100, 100, 150);
-    this.camera.lookAt(0, 0, 0);
+    this.applyCameraUpForCurrentShape();
     this.controls.reset();
   }
 
@@ -593,19 +650,69 @@ class Braille3DStudio {
       if (this.currentMesh.material) this.currentMesh.material.dispose();
       this.currentMesh = null;
     }
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        let geometry;
-        if (this.currentShape === 'card') geometry = (this.currentPlate === 'emboss') ? this.createEmbossingPlate() : this.createCounterPlate();
-        else geometry = (this.currentPlate === 'emboss') ? this.createCylinderEmbossing() : this.createCylinderCounter();
-        const material = new THREE.MeshPhongMaterial({ color: this.currentPlate === 'emboss' ? 0x667eea : 0x4ade80, specular: 0x222222, shininess: 30, wireframe: this.wireframe });
-        this.currentMesh = new THREE.Mesh(geometry, material);
-        this.currentMesh.castShadow = true; this.currentMesh.receiveShadow = true;
-        geometry.computeBoundingBox(); const center = new THREE.Vector3(); geometry.boundingBox.getCenter(center); geometry.translate(-center.x, -center.y, -center.z);
+        await this.ensureCsgAndGeometryModule();
+        let object3D = null;
+        const s = { ...this.settings };
+        // Map aliases expected by geometry module
+        s.emboss_dot_cylinder_diameter = s.emboss_dot_base_diameter;
+        s.emboss_dot_cylinder_height = s.emboss_dot_height;
+        s.indicator_recess_depth = s.counter_dot_depth;
+
+        const cylinderParams = {
+          diameter_mm: s.cylinder_diameter,
+          height_mm: s.cylinder_height,
+          polygonal_cutout_radius_mm: s.polygonal_cutout_radius,
+          polygonal_cutout_sides: s.polygonal_cutout_sides,
+          seam_offset_deg: s.seam_offset
+        };
+
+        const translated = this.brailleTranslations.slice(0, 4);
+
+        if (this.geometryModule) {
+          if (this.currentShape === 'card') {
+            object3D = (this.currentPlate === 'emboss')
+              ? this.geometryModule.buildCardEmbossingPlate(translated, s)
+              : this.geometryModule.buildCardCounterPlate(s);
+          } else {
+            object3D = (this.currentPlate === 'emboss')
+              ? this.geometryModule.buildCylinderEmbossingPlate(translated, s, cylinderParams)
+              : this.geometryModule.buildCylinderCounterPlate(s, cylinderParams);
+          }
+        }
+
+        if (!object3D) {
+          // Fallback to simple geometries
+          let geometry;
+          if (this.currentShape === 'card') geometry = (this.currentPlate === 'emboss') ? this.createEmbossingPlate() : this.createCounterPlate();
+          else geometry = (this.currentPlate === 'emboss') ? this.createCylinderEmbossing() : this.createCylinderCounter();
+          const material = new THREE.MeshPhongMaterial({ color: this.currentPlate === 'emboss' ? 0x667eea : 0x4ade80, specular: 0x222222, shininess: 30, wireframe: this.wireframe });
+          object3D = new THREE.Mesh(geometry, material);
+        }
+
+        this.currentMesh = object3D;
+        this.currentMesh.traverse?.(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; child.material.wireframe = this.wireframe; } });
+        // Center the object in the scene
+        const box = new THREE.Box3().setFromObject(this.currentMesh);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        this.currentMesh.position.x -= center.x;
+        this.currentMesh.position.y -= center.y;
+        this.currentMesh.position.z -= center.z;
         this.scene.add(this.currentMesh);
-        this.updateStats(geometry);
+
+        // Update stats if geometry is directly available; otherwise approximate from bounding box
+        if (this.currentMesh.geometry) {
+          this.updateStats(this.currentMesh.geometry);
+        } else {
+          document.getElementById('stats-display').style.display = 'block';
+          document.getElementById('stats-vertices').textContent = `Vertices: —`;
+          document.getElementById('stats-faces').textContent = `Faces: —`;
+          document.getElementById('stats-dots').textContent = `Braille Dots: ${this.dotCount || 0}`;
+        }
+
         document.getElementById('download-section').classList.add('active');
-        // Try server generation in background if available
         this.serverStlBlob = null;
         this.tryServerGeneration().finally(() => {
           this.hideLoading(); this.showStatus('Model generated successfully!', 'success');
@@ -725,15 +832,50 @@ class Braille3DStudio {
       const stlString = exporter.parse(this.currentMesh);
       blobPromise = Promise.resolve(new Blob([stlString], { type: 'text/plain' }));
     }
-    let filename = 'braille_';
+    let filename;
     if (this.currentPlate === 'emboss') {
-      filename += 'embossing_plate_';
-      if (this.originalLines[0]) filename += this.originalLines[0].substring(0,20).replace(/\s+/g,'_');
+      // Include first non-empty line text, else generic
+      let first = this.originalLines.find(l => (l || '').trim());
+      if (first) {
+        first = first.trim().substring(0, 30).replace(/[^\w\s-]/g, '').replace(/[-\s]+/g, '_').replace(/^_+|_+$/g, '');
+      }
+      filename = `braille_embossing_plate_${first || ''}-${this.currentShape}`;
     } else {
-      filename += 'counter_plate';
+      // Include total dot diameter (base + offset) for counter plates
+      const dotDiameter = parseFloat(this.settings.emboss_dot_base_diameter) || 0;
+      const counterOffset = parseFloat(this.settings.counter_plate_dot_size_offset || 0) || 0;
+      const totalDiameter = (dotDiameter + counterOffset).toFixed(2).replace(/\.00$/, '');
+      filename = `braille_counter_plate_${totalDiameter}mm-${this.currentShape}`;
     }
-    filename += '_' + this.currentShape + '.stl';
+    filename += '.stl';
     blobPromise.then(blob => { saveAs(blob, filename); this.showStatus('STL file downloaded!', 'success'); });
+  }
+
+  updateGridColumnsNote() {
+    const noteEl = document.getElementById('grid-columns-note');
+    if (!noteEl) return;
+    const total = this.settings.grid_columns;
+    if (this.currentPlate === 'emboss') {
+      const reserved = 2;
+      const available = Math.max(0, total - reserved);
+      noteEl.textContent = `${reserved} cells reserved for indicators • ${available} cells available`;
+    } else {
+      noteEl.textContent = `All ${total} cells available for counter plates`;
+    }
+  }
+
+  persistSettings() {
+    try {
+      const keys = [
+        'card_width','card_height','card_thickness','grid_columns','grid_rows','cell_spacing','line_spacing','dot_spacing',
+        'emboss_dot_base_diameter','emboss_dot_height','emboss_dot_flat_hat','counter_plate_dot_size_offset','counter_dot_depth',
+        'braille_x_adjust','braille_y_adjust','cylinder_diameter','cylinder_height','polygonal_cutout_radius','polygonal_cutout_sides',
+        'seam_offset','indicator_shapes','use_bowl_recess'
+      ];
+      const out = {}; keys.forEach(k => { if (this.settings.hasOwnProperty(k)) out[k] = this.settings[k]; });
+      out.currentShape = this.currentShape; out.currentPlate = this.currentPlate;
+      localStorage.setItem('braille3d_settings', JSON.stringify(out));
+    } catch {}
   }
 }
 

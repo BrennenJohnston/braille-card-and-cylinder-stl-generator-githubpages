@@ -1,5 +1,13 @@
 {
+  "name": "braille-card-and-cylinder-stl-generator",
+  "private": true,
   "dependencies": {
     "liblouis": "^0.4.0"
+  },
+  "scripts": {
+    "dev": "python local_github_pages_server.py --port 8000",
+    "dev:no-open": "python local_github_pages_server.py --port 8000 --no-open",
+    "verify": "python verify_github_pages_files.py",
+    "smoke": "python scripts/smoke_test.py"
   }
 }

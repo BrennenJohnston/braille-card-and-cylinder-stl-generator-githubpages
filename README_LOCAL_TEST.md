@@ -4,19 +4,24 @@ This setup allows you to test the Braille Card and Cylinder STL Generator locall
 
 ## 🚀 Quick Start
 
-### Option 1: Windows Batch File (Easiest)
+### Option 1: VS Code Debug (one-click)
+1. Open this folder in VS Code
+2. Press F5 and choose "Edge: Debug Frontend (local)" or "Chrome: Debug Frontend (local)"
+   - This automatically starts the local server and opens the app at the correct URL.
+
+### Option 2: Windows Batch File (Easiest without VS Code)
 ```
 double-click test_github_pages_locally.bat
 ```
 
-### Option 2: PowerShell
+### Option 3: PowerShell
 ```powershell
 .\test_github_pages_locally.ps1
 ```
 
-### Option 3: Direct Python
+### Option 4: Direct Python
 ```bash
-python local_github_pages_server.py
+python local_github_pages_server.py --port 8000
 ```
 
 ## 📋 What's Included
@@ -46,6 +51,8 @@ python verify_github_pages_files.py
 - **Server**: http://localhost:8000/braille-card-and-cylinder-stl-generator-githubpages/
 - **Direct App**: http://localhost:8000/braille-card-and-cylinder-stl-generator-githubpages/templates/index.html
 
+You can change the port with `--port 9000` and prevent auto-opening the browser with `--no-open`.
+
 ## 🐛 Debugging
 
 If something doesn't work:
@@ -54,6 +61,7 @@ If something doesn't work:
 2. **Verify Files**: Run `python verify_github_pages_files.py`
 3. **Clear Cache**: Ctrl+Shift+R in browser
 4. **Check Port**: Ensure port 8000 is free
+5. **Disable Caching**: The local server now adds no-cache headers to simplify debugging.
 
 ## 📝 Key Features to Test
 

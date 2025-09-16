@@ -10,6 +10,7 @@ import sys
 from urllib.parse import urlparse
 import webbrowser
 import time
+import argparse
 
 # Configuration
 PORT = 8000
@@ -50,11 +51,20 @@ class GitHubPagesHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        # Disable caching for easier local debugging
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
         super().end_headers()
 
-def run_server():
-    """Run the local GitHub Pages test server"""
-    print(f"Starting local GitHub Pages test server...")
+def run_server(port: int = PORT, open_browser: bool = True, strict_port: bool = False):
+    """Run the local GitHub Pages test server.
+
+    Args:
+        port: Preferred port to bind to.
+        open_browser: If True, open the system browser to the app URL.
+        strict_port: If True, do not fallback to another port when busy.
+    """
+    print("Starting local GitHub Pages test server...")
     print(f"Repository name: {REPO_NAME}")
     
     # Change to the script directory
@@ -65,7 +75,8 @@ def run_server():
 
     chosen_port = None
     last_err = None
-    for candidate in [PORT] + list(range(PORT + 1, PORT + 11)):
+    candidates = [port] if strict_port else [port] + list(range(port + 1, port + 11))
+    for candidate in candidates:
         try:
             httpd = socketserver.TCPServer(("", candidate), GitHubPagesHandler)
             chosen_port = candidate
@@ -75,7 +86,10 @@ def run_server():
             continue
 
     if chosen_port is None:
-        print("Failed to start server: no free port found near", PORT)
+        if strict_port:
+            print(f"Failed to start server: port {port} is busy and strict_port enabled")
+        else:
+            print("Failed to start server: no free port found near", port)
         if last_err:
             print("Last error:", last_err)
         sys.exit(1)
@@ -91,10 +105,11 @@ def run_server():
             print("\nPress Ctrl+C to stop the server")
             print("-" * 50)
 
-            # Open browser after a short delay
-            time.sleep(1)
-            print(f"Opening browser to {url}")
-            webbrowser.open(url)
+            if open_browser:
+                # Open browser after a short delay
+                time.sleep(1)
+                print(f"Opening browser to {url}")
+                webbrowser.open(url)
 
             httpd.serve_forever()
     except KeyboardInterrupt:
@@ -105,4 +120,10 @@ def run_server():
             pass
 
 if __name__ == "__main__":
-    run_server()
+    parser = argparse.ArgumentParser(description="Local GitHub Pages test server")
+    parser.add_argument("--port", type=int, default=PORT, help="Port to bind to (default: 8000)")
+    parser.add_argument("--no-open", action="store_true", help="Do not open a browser window")
+    parser.add_argument("--strict-port", action="store_true", help="Fail if the specified port is busy; do not fallback")
+    args = parser.parse_args()
+
+    run_server(port=args.port, open_browser=not args.no_open, strict_port=args.strict_port)

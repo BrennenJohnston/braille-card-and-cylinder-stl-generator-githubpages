@@ -1,8 +1,8 @@
 // Geometry builders for client-side STL generation
 // Uses three.js primitives to construct positive embossing plates for card and cylinder
 
-import * as THREE from 'three';
-import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg';
+const THREE = window.THREE;
+const { Brush, Evaluator, ADDITION, SUBTRACTION } = (window.ThreeBvhCsg || {});
 
 function getAvailableColumns(settings) {
     const gridColumns = Number(settings.grid_columns || settings.gridColumns || 26);
@@ -462,6 +462,7 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
     const height = toNumber(cylinderParams.height_mm, toNumber(settings.card_height, 54));
     const seamOffsetDeg = toNumber(cylinderParams.seam_offset_deg, 355);
     const cutoutInscribed = toNumber(cylinderParams.polygonal_cutout_radius_mm, 0);
+    const cutoutSides = Math.max(3, Math.min(20, toNumber(cylinderParams.polygonal_cutout_sides, 12)));
 
     const radius = diameter / 2;
     const thetaOffset = seamOffsetDeg * Math.PI / 180;
@@ -490,7 +491,7 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
     // Optional polygonal cutout (12-gon), subtract along cylinder axis (Z), rotated to seam offset
     // Skip cutout if in debug triangle mode
     if (cutoutInscribed > 0 && !debugTriangleOnly) {
-        const sides = 12;
+        const sides = cutoutSides;
         const shape2d = new THREE.Shape();
         for (let i = 0; i <= sides; i++) {
             const angle = (i / sides) * Math.PI * 2;
@@ -946,7 +947,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const cutoutInscribed = toNumber(cylinderParams.polygonal_cutout_radius_mm, 0);
     // Skip cutout if in debug triangle mode
     if (cutoutInscribed > 0 && !debugTriangleOnly) {
-        const sides = 12;
+        const sides = cutoutSides;
         const shape2d = new THREE.Shape();
         for (let i = 0; i <= sides; i++) {
             const angle = (i / sides) * Math.PI * 2;
