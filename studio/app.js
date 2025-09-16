@@ -2,73 +2,142 @@ const appRoot = document.getElementById('app-root');
 
 appRoot.innerHTML = `
   <div class="container">
+    <div class="top-chrome">
+      <div class="top-title">Braille Plate & Cylinder STL Generator</div>
+      <div class="top-controls">
+        <div class="font-controls">
+          <button class="font-btn" id="font-dec">A-</button>
+          <button class="font-btn" id="font-current">100%</button>
+          <button class="font-btn" id="font-inc">A+</button>
+          <button class="font-btn" id="font-reset">⟲ Reset font size</button>
+        </div>
+        <button class="theme-btn" id="theme-toggle">Change Theme to → Dark</button>
+        <button class="contrast-btn" id="contrast-toggle">⚡ High Contrast</button>
+      </div>
+    </div>
     <header>
-      <h1>⠠⠃⠗⠇ Braille3D Studio</h1>
-      <p class="subtitle">Professional Braille STL Generator for 3D Printing</p>
+      <h1>Braille Plate & Cylinder STL Generator</h1>
+      <p class="subtitle">Accessible, standards-aligned braille plate and cylinder STL creation</p>
     </header>
 
     <div class="main-content">
       <div class="panel controls-panel">
-        <h2 style="margin-bottom: 20px; color: #333;">Configuration</h2>
+        <h2 style="margin-bottom: 20px; color: #333;">Enter Text for Braille Translation</h2>
         <div class="form-group">
           <label for="text-input">Text to Convert (Max 4 lines)</label>
           <textarea id="text-input" placeholder="Enter your text here... (Line 1)&#10;(Line 2)&#10;(Line 3)&#10;(Line 4)">Hello World\nWelcome to\nBraille3D\nStudio</textarea>
-          <div class="info-text">Each line will be automatically translated to braille</div>
+          <div class="info-text">Contracted braille uses Grade 2 (UEB). Up to 4 lines. 2 cells are reserved for row indicators; remaining cells available for text.</div>
         </div>
 
         <div class="form-group">
-          <label for="braille-grade">Braille Grade</label>
-          <select id="braille-grade">
-            <option value="2" selected>Grade 2 (Contracted - Recommended)</option>
-            <option value="1">Grade 1 (Uncontracted)</option>
-          </select>
-          <div class="info-text">Grade 2 is standard for most applications</div>
+          <fieldset>
+            <legend>Select Language</legend>
+            <label style="display:block; margin-bottom:6px;"><input type="radio" name="lang" id="lang-g2" value="g2" checked> English, U.S., contracted (UEB grade 2)</label>
+            <label style="display:block;"><input type="radio" name="lang" id="lang-g1" value="g1"> English, U.S., uncontracted (UEB grade 1)</label>
+          </fieldset>
+          <div class="helper-note">Grade 2 is default for U.S. English</div>
         </div>
 
         <div class="form-group">
-          <label>Shape Type</label>
+          <label>Select Output Shape</label>
           <div class="shape-selector">
-            <button class="shape-btn active" data-shape="card">📇 Business Card</button>
-            <button class="shape-btn" data-shape="cylinder">🔲 Cylinder</button>
+            <button class="shape-btn active" data-shape="card">Flat Card</button>
+            <button class="shape-btn" data-shape="cylinder">Cylinder</button>
           </div>
+          <div class="helper-note">Any changes here affect both plates.</div>
         </div>
 
         <div class="braille-preview-container">
-          <div class="braille-preview-label">Braille Translation Preview:</div>
+          <div class="braille-preview-label">Preview Braille Translation</div>
           <div class="braille-preview" id="braille-preview"></div>
+        </div>
+
+        <div class="disclosure">
+          <button id="program-desc-toggle">Program Description • More Info ▼</button>
+          <div class="content" id="program-desc" style="display:none;">
+            This tool generates 3D-printable STL files for braille embossing plates and universal counter plates, and supports cylinder workflows. Translation is powered by Liblouis (UEB).
+          </div>
+        </div>
+
+        <div class="disclosure">
+          <button id="instructions-toggle">Instructions (Cylinder-first workflow) ▼</button>
+          <div class="content" id="instructions" style="display:none;">
+            <ol>
+              <li>Select Cylinder in Output Shape and set cylinder dimensions.</li>
+              <li>Enter your text and verify translation in the preview.</li>
+              <li>Generate the Embossing Plate and print.</li>
+              <li>Switch to Universal Counter Plate and generate/print.</li>
+              <li>Use the counter plate to create consistent, recessed impressions.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="disclosure">
+          <button id="ack-toggle">Acknowledgements ▼</button>
+          <div class="content" id="ack" style="display:none;">
+            Translation by Liblouis. Thanks to contributors and the braille community for guidance and testing.
+          </div>
         </div>
 
         <div class="expert-section">
           <div class="toggle-group">
             <input type="checkbox" id="expert-mode" />
             <label for="expert-mode" style="margin-bottom: 0; cursor: pointer;">
-              <strong>Expert Mode</strong> - Advanced Parameters
+              <strong>Show Expert Mode ▼</strong>
             </label>
           </div>
 
           <div class="expert-params hidden" id="expert-params">
+            <div class="param-section">
+              <h4>Output shape</h4>
+              <div class="helper-note">Any changes here affect both plates.</div>
+              <div class="shape-selector">
+                <button class="shape-btn active" data-shape="card">Flat Card</button>
+                <button class="shape-btn" data-shape="cylinder">Cylinder</button>
+              </div>
+            </div>
+
             <div class="param-section card-params">
-              <h4>Card Dimensions</h4>
+              <h4>Plate Dimensions (flat)</h4>
               <div class="param-grid">
                 <div class="param-input">
-                  <label>Card Width (mm)</label>
+                  <label>Plate Width (mm)</label>
                   <input type="number" id="card-width" value="88" step="1" min="50" max="150">
                 </div>
                 <div class="param-input">
-                  <label>Card Height (mm)</label>
+                  <label>Plate Height (mm)</label>
                   <input type="number" id="card-height" value="51" step="1" min="30" max="100">
                 </div>
                 <div class="param-input">
                   <label>Plate Thickness (mm)</label>
                   <input type="number" id="plate-thickness" value="3" step="0.5" min="2" max="10">
                 </div>
+              </div>
+            </div>
+
+            <div class="param-section">
+              <h4>Braille Dimensions</h4>
+              <div class="param-grid">
                 <div class="param-input">
-                  <label>Grid Columns</label>
-                  <input type="number" id="grid-columns" value="14" step="1" min="8" max="20">
+                  <label>Number of Braille Cells (Characters)</label>
+                  <input type="number" id="grid-columns" value="14" step="1" min="8" max="30">
+                  <div class="section-note">2 cells reserved for row indicators... 12 cells available.</div>
                 </div>
                 <div class="param-input">
-                  <label>Grid Rows</label>
+                  <label>Number of Braille Lines</label>
                   <input type="number" id="grid-rows" value="4" step="1" min="1" max="6">
+                </div>
+                <div class="param-input">
+                  <label>Braille Cell Spacing</label>
+                  <input type="number" id="cell-width" value="6.5" step="0.1" min="4" max="10">
+                </div>
+                <div class="param-input">
+                  <label>Braille Line Spacing</label>
+                  <input type="number" id="line-spacing" value="10.0" step="0.1" min="8" max="15">
+                </div>
+                <div class="param-input">
+                  <label>Braille Dot Spacing</label>
+                  <input type="number" id="dot-spacing" value="2.5" step="0.1" min="1.5" max="4">
                 </div>
               </div>
             </div>
@@ -77,15 +146,15 @@ appRoot.innerHTML = `
               <h4>Cylinder Dimensions</h4>
               <div class="param-grid">
                 <div class="param-input">
-                  <label>Diameter (mm)</label>
+                  <label>Cylinder Diameter (mm)</label>
                   <input type="number" id="cylinder-diameter" value="31.35" step="0.1" min="20" max="100">
                 </div>
                 <div class="param-input">
-                  <label>Height (mm)</label>
+                  <label>Cylinder Height (mm)</label>
                   <input type="number" id="cylinder-height" value="51" step="1" min="20" max="200">
                 </div>
                 <div class="param-input">
-                  <label>Cutout Radius (mm)</label>
+                  <label>Polygonal Cutout Inscribed Radius (mm)</label>
                   <input type="number" id="cutout-radius" value="13" step="1" min="0" max="30">
                 </div>
                 <div class="param-input">
@@ -93,48 +162,38 @@ appRoot.innerHTML = `
                   <input type="number" id="cutout-sides" value="12" step="1" min="3" max="20">
                 </div>
                 <div class="param-input">
-                  <label>Seam Offset (deg)</label>
+                  <label>Seam Offset (degrees)</label>
                   <input type="number" id="seam-offset" value="355" step="1" min="0" max="360">
                 </div>
               </div>
+              <div class="inline-warning" id="cylinder-warning" style="display:none;">Warning: Rotating the seam changes the starting position of rows and indicators.</div>
             </div>
 
             <div class="param-section">
-              <h4>Braille Dot Geometry</h4>
+              <h4>Dot Dimensions (emboss)</h4>
               <div class="param-grid">
                 <div class="param-input">
-                  <label>Dot Height (mm)</label>
+                  <label>Dot height (mm)</label>
                   <input type="number" id="dot-height" value="1.0" step="0.1" min="0.1" max="2">
                 </div>
                 <div class="param-input">
-                  <label>Dot Base Diameter (mm)</label>
+                  <label>Dot diameter (mm)</label>
                   <input type="number" id="dot-diameter" value="1.8" step="0.1" min="0.5" max="3">
                 </div>
                 <div class="param-input">
-                  <label>Dot Top Diameter (mm)</label>
+                  <label>Flat hat diameter (mm)</label>
                   <input type="number" id="dot-top" value="0.4" step="0.1" min="0.1" max="2">
-                </div>
-                <div class="param-input">
-                  <label>Cell Width (mm)</label>
-                  <input type="number" id="cell-width" value="6.5" step="0.1" min="4" max="10">
-                </div>
-                <div class="param-input">
-                  <label>Line Spacing (mm)</label>
-                  <input type="number" id="line-spacing" value="10.0" step="0.1" min="8" max="15">
-                </div>
-                <div class="param-input">
-                  <label>Dot Spacing (mm)</label>
-                  <input type="number" id="dot-spacing" value="2.5" step="0.1" min="1.5" max="4">
                 </div>
               </div>
             </div>
 
             <div class="param-section">
-              <h4>Counter Plate</h4>
+              <h4>Counter Dot Dimensions</h4>
               <div class="param-grid">
                 <div class="param-input">
-                  <label>Counter Dot Diameter (mm)</label>
-                  <input type="number" id="counter-diameter" value="1.6" step="0.1" min="0.5" max="3">
+                  <label>Counter Dot Diameter Offset (mm)</label>
+                  <input type="number" id="counter-offset" value="0.0" step="0.1" min="-1" max="1">
+                  <div class="section-note">Positive increases recess size; negative decreases relative to emboss dot diameter. Counter plate mirrors the emboss dot diameter plus this offset.</div>
                 </div>
                 <div class="param-input">
                   <label>Recess Depth (mm)</label>
@@ -156,14 +215,14 @@ appRoot.innerHTML = `
             </div>
 
             <div class="param-section">
-              <h4>Position Adjustments</h4>
+              <h4>Positioning</h4>
               <div class="param-grid">
                 <div class="param-input">
-                  <label>X Offset (mm)</label>
+                  <label>X Adjust</label>
                   <input type="number" id="x-offset" value="0" step="0.1" min="-10" max="10">
                 </div>
                 <div class="param-input">
-                  <label>Y Offset (mm)</label>
+                  <label>Y Adjust</label>
                   <input type="number" id="y-offset" value="0" step="0.1" min="-10" max="10">
                 </div>
               </div>
@@ -172,12 +231,13 @@ appRoot.innerHTML = `
         </div>
 
         <div class="generate-section">
-          <label>Plate Type</label>
+          <label>Select Plate to Generate</label>
           <div class="plate-selector">
             <button class="plate-btn active" data-plate="emboss">Embossing Plate</button>
-            <button class="plate-btn" data-plate="counter">Counter Plate</button>
+            <button class="plate-btn" data-plate="counter">Universal Counter Plate</button>
           </div>
-          <button class="generate-btn" id="generate-btn">Generate 3D Model</button>
+          <div class="helper-note">Embossing creates raised braille dots. Universal Counter creates recessed dots.</div>
+          <button class="generate-btn" id="generate-btn">Generate STL</button>
           <div class="status-message" id="status-message"></div>
           <div class="stats-display" id="stats-display" style="display:none;">
             <div id="stats-vertices">Vertices: 0</div>
@@ -228,6 +288,14 @@ class Braille3DStudio {
     this.wireframe = false;
     this.brailleTranslations = ['', '', '', ''];
     this.originalLines = ['', '', '', ''];
+    this.apiBaseUrl = (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || '';
+    this.fontScale = 1.0;
+    this.worker = null;
+    this.workerReady = false;
+    this.pendingMessages = new Map();
+    this.messageSeq = 1;
+    this.grade = 'g2'; // g1 or g2
+    this.serverStlBlob = null;
 
     this.settings = this.getDefaultSettings();
     this.init();
@@ -277,8 +345,42 @@ class Braille3DStudio {
   }
 
   setupEventListeners() {
+    // Top chrome controls
+    const updateFontUi = () => {
+      const pct = Math.round(this.fontScale * 100);
+      document.getElementById('font-current').textContent = pct + '%';
+      document.body.style.fontSize = pct + '%';
+    };
+    document.getElementById('font-inc').addEventListener('click', () => { this.fontScale = Math.min(1.8, this.fontScale + 0.1); updateFontUi(); });
+    document.getElementById('font-dec').addEventListener('click', () => { this.fontScale = Math.max(0.7, this.fontScale - 0.1); updateFontUi(); });
+    document.getElementById('font-reset').addEventListener('click', () => { this.fontScale = 1.0; updateFontUi(); });
+    updateFontUi();
+
+    document.getElementById('theme-toggle').addEventListener('click', e => {
+      document.body.classList.toggle('dark-theme');
+      const isDark = document.body.classList.contains('dark-theme');
+      e.target.textContent = 'Change Theme to → ' + (isDark ? 'Light' : 'Dark');
+    });
+    document.getElementById('contrast-toggle').addEventListener('click', e => {
+      document.body.classList.toggle('high-contrast');
+      e.target.classList.toggle('active', document.body.classList.contains('high-contrast'));
+    });
+
+    // Disclosures
+    const hookDisclosure = (btnId, contentId) => {
+      const btn = document.getElementById(btnId); const content = document.getElementById(contentId);
+      if (btn && content) btn.addEventListener('click', () => { content.style.display = content.style.display === 'none' ? 'block' : 'none'; });
+    };
+    hookDisclosure('program-desc-toggle', 'program-desc');
+    hookDisclosure('instructions-toggle', 'instructions');
+    hookDisclosure('ack-toggle', 'ack');
+
+    // Text + language
     document.getElementById('text-input').addEventListener('input', () => this.translateText());
-    document.getElementById('braille-grade').addEventListener('change', () => this.translateText());
+    const langG2 = document.getElementById('lang-g2');
+    const langG1 = document.getElementById('lang-g1');
+    if (langG2) langG2.addEventListener('change', () => { if (langG2.checked) { this.grade = 'g2'; this.translateText(); } });
+    if (langG1) langG1.addEventListener('change', () => { if (langG1.checked) { this.grade = 'g1'; this.translateText(); } });
 
     document.querySelectorAll('.shape-btn').forEach(btn => {
       btn.addEventListener('click', e => {
@@ -328,7 +430,7 @@ class Braille3DStudio {
       'cell-width': 'cell_spacing',
       'line-spacing': 'line_spacing',
       'dot-spacing': 'dot_spacing',
-      'counter-diameter': 'bowl_counter_dot_base_diameter',
+      'counter-offset': 'counter_plate_dot_size_offset',
       'counter-depth': 'counter_dot_depth',
       'x-offset': 'braille_x_adjust',
       'y-offset': 'braille_y_adjust'
@@ -341,6 +443,13 @@ class Braille3DStudio {
 
     document.getElementById('use-bowl')?.addEventListener('change', e => { this.settings.use_bowl_recess = e.target.checked ? 1 : 0; });
     document.getElementById('indicator-shapes')?.addEventListener('change', e => { this.settings.indicator_shapes = e.target.checked ? 1 : 0; });
+
+    // Cylinder warning on seam change
+    const seamEl = document.getElementById('seam-offset');
+    if (seamEl) seamEl.addEventListener('change', () => {
+      const warn = document.getElementById('cylinder-warning');
+      if (warn) warn.style.display = (parseFloat(seamEl.value) !== 355) ? 'block' : 'none';
+    });
   }
 
   updateShapeParams() {
@@ -397,21 +506,56 @@ class Braille3DStudio {
   }
 
   setupBrailleTranslation() {
-    this.brailleTable = {
-      'a':'⠁','b':'⠃','c':'⠉','d':'⠙','e':'⠑','f':'⠋','g':'⠛','h':'⠓','i':'⠊','j':'⠚',
-      'k':'⠅','l':'⠇','m':'⠍','n':'⠝','o':'⠕','p':'⠏','q':'⠟','r':'⠗','s':'⠎','t':'⠞',
-      'u':'⠥','v':'⠧','w':'⠺','x':'⠭','y':'⠽','z':'⠵',' ':'⠀',
-      '0':'⠚','1':'⠁','2':'⠃','3':'⠉','4':'⠙','5':'⠑','6':'⠋','7':'⠛','8':'⠓','9':'⠊'
-    };
-    this.translateText();
+    try {
+      this.worker = new Worker('static/liblouis-worker.js');
+      this.worker.onmessage = (e) => {
+        const { id, type, result } = e.data || {};
+        if (!id) return;
+        const resolver = this.pendingMessages.get(id);
+        if (resolver) {
+          this.pendingMessages.delete(id);
+          resolver(result);
+        }
+      };
+      this.callWorker('init', {}).then(res => {
+        this.workerReady = !!(res && res.success);
+        this.translateText();
+      }).catch(() => { this.workerReady = false; this.translateText(); });
+    } catch (e) {
+      console.warn('Liblouis worker failed to initialize, falling back to naive mapping', e);
+      this.worker = null;
+      this.workerReady = false;
+      this.translateText();
+    }
+  }
+
+  callWorker(type, data) {
+    return new Promise((resolve) => {
+      const id = this.messageSeq++;
+      this.pendingMessages.set(id, resolve);
+      this.worker.postMessage({ id, type, data });
+      // Add safety timeout
+      setTimeout(() => { if (this.pendingMessages.has(id)) { this.pendingMessages.delete(id); resolve({ success: false, error: 'timeout' }); } }, 8000);
+    });
   }
 
   translateText() {
     const text = document.getElementById('text-input').value;
-    const lines = text.split('\n').slice(0,4);
-    this.originalLines = lines.map(l => l.trim());
-    this.brailleTranslations = lines.map(line => line.toLowerCase().split('').map(ch => this.brailleTable[ch] || ch).join(''));
-    document.getElementById('braille-preview').textContent = this.brailleTranslations.join('\n');
+    const rawLines = text.split('\n').slice(0,4);
+    this.originalLines = rawLines.map(l => l.trim());
+    const doRender = (joined) => {
+      const lines = (joined || '').split('\n').slice(0,4);
+      this.brailleTranslations = lines;
+      document.getElementById('braille-preview').textContent = this.brailleTranslations.join('\n');
+    };
+    if (this.worker && this.workerReady) {
+      this.callWorker('translate', { text, grade: this.grade }).then(res => {
+        if (res && res.success) doRender(res.translation); else doRender(text);
+      }).catch(() => doRender(text));
+    } else {
+      // Fallback: identity (no translation)
+      doRender(text);
+    }
   }
 
   resetView() {
@@ -461,11 +605,48 @@ class Braille3DStudio {
         this.scene.add(this.currentMesh);
         this.updateStats(geometry);
         document.getElementById('download-section').classList.add('active');
-        this.hideLoading(); this.showStatus('Model generated successfully!', 'success');
+        // Try server generation in background if available
+        this.serverStlBlob = null;
+        this.tryServerGeneration().finally(() => {
+          this.hideLoading(); this.showStatus('Model generated successfully!', 'success');
+        });
       } catch (e) {
         console.error(e); this.hideLoading(); this.showStatus('Error generating model: ' + e.message, 'error');
       }
     }, 50);
+  }
+
+  async tryServerGeneration() {
+    try {
+      if (!this.apiBaseUrl) return;
+      if (this.currentShape !== 'card') return; // Backend only supports flat plates
+      if (this.currentPlate === 'emboss') {
+        const lines = this.buildBrailleLinesForServer();
+        const resp = await fetch(this.apiBaseUrl + '/generate_braille_stl', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ braille_lines: lines })
+        });
+        if (resp.ok) this.serverStlBlob = await resp.blob();
+      } else {
+        const body = {
+          emboss_dot_base_diameter: this.settings.emboss_dot_base_diameter,
+          counter_plate_dot_size_offset: this.settings.counter_plate_dot_size_offset || 0,
+        };
+        const resp = await fetch(this.apiBaseUrl + '/generate_counter_plate_stl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (resp.ok) this.serverStlBlob = await resp.blob();
+      }
+    } catch (e) {
+      console.warn('Server STL generation failed or unavailable', e);
+    }
+  }
+
+  buildBrailleLinesForServer() {
+    const availableColumns = Math.max(0, (this.settings.grid_columns || 14) - 2);
+    const lines = [];
+    for (let i = 0; i < 4; i++) {
+      const line = (this.brailleTranslations[i] || '').slice(0, availableColumns);
+      lines.push(line);
+    }
+    return lines;
   }
 
   createEmbossingPlate() {
@@ -536,19 +717,23 @@ class Braille3DStudio {
 
   downloadSTL() {
     if (!this.currentMesh) { this.showStatus('No model to download', 'error'); return; }
-    const exporter = new THREE.STLExporter();
-    const stlString = exporter.parse(this.currentMesh);
-    const blob = new Blob([stlString], { type: 'text/plain' });
+    let blobPromise;
+    if (this.serverStlBlob) {
+      blobPromise = Promise.resolve(this.serverStlBlob);
+    } else {
+      const exporter = new THREE.STLExporter();
+      const stlString = exporter.parse(this.currentMesh);
+      blobPromise = Promise.resolve(new Blob([stlString], { type: 'text/plain' }));
+    }
     let filename = 'braille_';
     if (this.currentPlate === 'emboss') {
       filename += 'embossing_plate_';
       if (this.originalLines[0]) filename += this.originalLines[0].substring(0,20).replace(/\s+/g,'_');
     } else {
-      filename += 'counter_plate_' + this.settings.bowl_counter_dot_base_diameter + 'mm';
+      filename += 'counter_plate';
     }
     filename += '_' + this.currentShape + '.stl';
-    saveAs(blob, filename);
-    this.showStatus('STL file downloaded!', 'success');
+    blobPromise.then(blob => { saveAs(blob, filename); this.showStatus('STL file downloaded!', 'success'); });
   }
 }
 

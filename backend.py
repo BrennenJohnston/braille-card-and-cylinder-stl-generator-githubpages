@@ -225,7 +225,7 @@ def _create_hemisphere_sphere(dot_x: float, dot_y: float, radius: float) -> trim
     return sphere
 
 
-def build_counter_plate_with_hemispheres() -> trimesh.Trimesh:
+def build_counter_plate_with_hemispheres(override_hemisphere_diameter: float | None = None) -> trimesh.Trimesh:
     """Create a counter plate with hemispherical recesses and recessed indicator markers.
 
     This implementation follows the working upstream approach:
@@ -247,8 +247,13 @@ def build_counter_plate_with_hemispheres() -> trimesh.Trimesh:
     dot_row_offsets = [DOT_SPACING, 0.0, -DOT_SPACING]
     dot_positions = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)]
 
-    # Hemisphere radius - use dot spacing/2 for proper recess size
-    hemisphere_radius = DOT_SPACING / 2.0
+    # Hemisphere radius
+    # Default behavior uses dot spacing/2 for proper recess size
+    # Allow override via explicit diameter to support UI "Counter Dot Diameter Offset (mm)"
+    if override_hemisphere_diameter is not None and override_hemisphere_diameter > 0:
+        hemisphere_radius = float(override_hemisphere_diameter) / 2.0
+    else:
+        hemisphere_radius = DOT_SPACING / 2.0
 
     # Create icospheres (hemispheres) for all dot positions
     sphere_meshes = []
@@ -267,7 +272,7 @@ def build_counter_plate_with_hemispheres() -> trimesh.Trimesh:
                 dot_x = x_pos + dot_col_offsets[dot_pos[1]]
                 dot_y = y_pos + dot_row_offsets[dot_pos[0]]
 
-                # Create icosphere with proper radius
+                # Create icosphere with configured radius
                 sphere = trimesh.creation.icosphere(subdivisions=2, radius=hemisphere_radius)
                 # Position so equator lies at top surface (z = CARD_THICKNESS)
                 sphere.apply_translation((dot_x, dot_y, CARD_THICKNESS))
@@ -385,9 +390,22 @@ def generate_counter_plate_stl():
     - Triangle marker recessed at last column of each row (apex toward right)
     - Hemispherical recesses for all six dots in every text cell
     """
-    # Optional: accept no body or ignore content; this plate is text-agnostic
+    # Optional: accept JSON body with override for hemispherical recess diameter
+    body = request.get_json(silent=True) or {}
+    override_diameter = None
     try:
-        mesh = build_counter_plate_with_hemispheres()
+        # Preferred explicit diameter parameter name
+        if 'counter_plate_dot_cylinder_diameter' in body:
+            override_diameter = float(body['counter_plate_dot_cylinder_diameter'])
+        # Back-compat: allow base + offset from UI
+        elif 'emboss_dot_base_diameter' in body or 'counter_plate_dot_size_offset' in body:
+            base = float(body.get('emboss_dot_base_diameter', 1.8))
+            offset = float(body.get('counter_plate_dot_size_offset', 0.0))
+            override_diameter = max(0.1, base + offset)
+    except Exception:
+        override_diameter = None
+    try:
+        mesh = build_counter_plate_with_hemispheres(override_hemisphere_diameter=override_diameter)
         stl_io = io.BytesIO()
         mesh.export(stl_io, file_type='stl')
         stl_io.seek(0)
