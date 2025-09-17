@@ -4,21 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Braille Plate & Cylinder STL Generator</title>
+    <meta http-equiv="refresh" content="0; url=templates/index.html" />
     <link rel="icon" href="static/favicon.svg" />
-    <link rel="stylesheet" href="studio/styles.css" />
-    <!-- Three.js core and examples -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
-    <!-- Utilities -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script src="static/app-config.js"></script>
+    <script>
+        // Fallback redirect if meta refresh is blocked
+        (function(){
+            var target = 'templates/index.html';
+            if (location.pathname.endsWith('/') || location.pathname.endsWith('/index.html')) {
+                window.location.replace(target);
+            }
+        })();
+    </script>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 2rem; }
+        a { color: #2563eb; }
+    </style>
+    <noscript>
+        <meta http-equiv="refresh" content="0;url=templates/index.html" />
+    </noscript>
+    <link rel="canonical" href="templates/index.html" />
+    
 </head>
 <body>
-    <div id="app-root"></div>
-    <script type="module" src="studio/app.js"></script>
+    <p>Redirecting to <a href="templates/index.html">templates/index.html</a>…</p>
 </body>
 </html>
 

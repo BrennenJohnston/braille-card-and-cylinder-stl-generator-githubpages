@@ -1,9 +1,0 @@
-flask
-trimesh
-numpy
-gunicorn
-flask-cors 
-shapely 
-mapbox-earcut
-manifold3d
-matplotlib 

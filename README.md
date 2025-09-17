@@ -35,9 +35,9 @@ This web application generates STL files for 3D-printable braille embossing and 
 ## 3. 5-Minute Quick-Start (Cylinder-first)
 
 ### Web Application (Recommended)
-1. **Local dev**: run `python backend.py` and open `http://localhost:5001`
-2. **Vercel**: connect repo and deploy; serverless entry is `wsgi.py`
-2. **Enter your text** (up to 4 lines)
+1. **Local test**: run `python local_github_pages_server.py --port 8000`
+2. **Open**: http://localhost:8000/braille-card-and-cylinder-stl-generator-githubpages/
+3. **Enter your text** (up to 4 lines)
 3. **Select braille grade** (Grade 2 recommended for most users)
 4. The default **Output Shape** is **Cylinder**. Click **Generate**.
 5. **Download** and 3D print your cylinder (or counter plate).
@@ -181,24 +181,11 @@ Attribution: This project was originally based on
 - Endpoints (legacy): `/liblouis/tables`, `/generate_braille_stl`, `/generate_counter_plate_stl`.
 - Static mode: liblouis tables loaded from `static/liblouis/tables/` with a manifest; STL generated client-side.
 
-### Local development
+### Local development (static only)
 ```bash
-# Server-backed (legacy):
-pip install -r requirements.txt
-python backend.py  # opens http://localhost:5001
-
-# Static (no backend; GitHub Pages-compatible):
-# Option A: Node
-npx http-server -c-1 .
-# Option B: Python
-python -m http.server 8080
-# Then open http://127.0.0.1:8080/templates/index.html
+python local_github_pages_server.py --port 8000
+# Then open http://localhost:8000/braille-card-and-cylinder-stl-generator-githubpages/
 ```
-
-### Vercel deployment
-- Project uses `vercel.json` and `wsgi.py` with `@vercel/python`.
-- Install step: `pip install -r requirements_vercel.txt` (smaller footprint for serverless).
-- Static liblouis tables are bundled and loaded on-demand from `static/liblouis/tables/` in a web worker.
 
 ---
 

@@ -4,10 +4,7 @@ This guide explains how to test the Braille Card and Cylinder STL Generator loca
 
 ## Overview
 
-The application runs in two modes:
-1. **Client-side mode** (GitHub Pages): All STL generation happens in the browser using Three.js
-2. **Server mode** (Vercel/local Flask): STL generation happens on the backend using Python
-
+All STL generation happens in the browser using Three.js (no backend).
 This testing setup mimics the GitHub Pages deployment where everything runs client-side.
 
 ## Quick Start
