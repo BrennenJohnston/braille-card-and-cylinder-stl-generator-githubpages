@@ -1,8 +1,64 @@
 // Geometry builders for client-side STL generation
 // Uses three.js primitives to construct positive embossing plates for card and cylinder
+import * as THREE from 'three';
+import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg';
 
-const THREE = window.THREE;
-const { Brush, Evaluator, ADDITION, SUBTRACTION } = (window.ThreeBvhCsg || {});
+function getResolutionConfig(settings) {
+    const perf = !!(settings && settings.performance_mode);
+    let quality = (settings && settings.quality) ? String(settings.quality).toLowerCase() : 'draft';
+    if (perf) quality = 'draft'; // Performance mode forces fastest geometry
+
+    // Presets tuned for speed vs quality
+    const presets = {
+        draft: {
+            cylinderTargetResolutionMm: 1.0,
+            dotTargetResolutionMm: 0.8,
+            latheTargetResolutionMm: 1.0,
+            cylinderMinSegments: 16,
+            cylinderMaxSegments: 96,
+            dotMinSegments: 8,
+            dotMaxSegments: 20,
+            hemisphereMinSegments: 8,
+            hemisphereMaxSegments: 24,
+            latheMinSegments: 8,
+            latheMaxSegments: 24,
+            domeSamples: 6,
+            sphericalCapNumPoints: 10
+        },
+        standard: {
+            cylinderTargetResolutionMm: 0.4,
+            dotTargetResolutionMm: 0.3,
+            latheTargetResolutionMm: 0.35,
+            cylinderMinSegments: 24,
+            cylinderMaxSegments: 128,
+            dotMinSegments: 12,
+            dotMaxSegments: 28,
+            hemisphereMinSegments: 12,
+            hemisphereMaxSegments: 36,
+            latheMinSegments: 12,
+            latheMaxSegments: 36,
+            domeSamples: 10,
+            sphericalCapNumPoints: 16
+        },
+        high: {
+            cylinderTargetResolutionMm: 0.15,
+            dotTargetResolutionMm: 0.15,
+            latheTargetResolutionMm: 0.2,
+            cylinderMinSegments: 32,
+            cylinderMaxSegments: 128,
+            dotMinSegments: 16,
+            dotMaxSegments: 32,
+            hemisphereMinSegments: 16,
+            hemisphereMaxSegments: 48,
+            latheMinSegments: 16,
+            latheMaxSegments: 48,
+            domeSamples: 12,
+            sphericalCapNumPoints: 20
+        }
+    };
+
+    return presets[quality] || presets.draft;
+}
 
 function getAvailableColumns(settings) {
     const gridColumns = Number(settings.grid_columns || settings.gridColumns || 26);
@@ -16,6 +72,21 @@ function getGridRows(settings) {
 function toNumber(v, fallback = 0) {
     const n = Number(v);
     return Number.isFinite(n) ? n : fallback;
+}
+
+function parseManualOffsets(settings, gridRows) {
+    try {
+        const raw = settings.manual_start_offsets;
+        if (!raw) return new Array(gridRows).fill(0);
+        const arr = Array.isArray(raw) ? raw : JSON.parse(raw);
+        const result = [];
+        for (let i = 0; i < gridRows; i++) {
+            result.push(toNumber(arr[i], 0));
+        }
+        return result;
+    } catch (_err) {
+        return new Array(gridRows).fill(0);
+    }
 }
 
 function brailleUnicodeToDots(ch) {
@@ -64,7 +135,7 @@ function createUnifiedRecessGeometry(cylinderRadius, cylinderHeight, domeHeight,
     return geometry;
 }
 
-function createSphericalCapForRecess(baseRadius, recessDepth) {
+function createSphericalCapForRecess(baseRadius, recessDepth, settings) {
     // Create a proper spherical cap geometry using LatheGeometry for manifold-safe results
     // This avoids issues with full sphere subtraction
     const a = baseRadius;
@@ -91,7 +162,8 @@ function createSphericalCapForRecess(baseRadius, recessDepth) {
     points.push(new THREE.Vector2(a, 0));
     
     // Create the spherical cap profile
-    const numPoints = 20; // Increased for smoother curve
+    const cfg = getResolutionConfig(settings);
+    const numPoints = cfg.sphericalCapNumPoints; // Profile resolution
     for (let i = 1; i <= numPoints; i++) {
         // Calculate angle from edge to center bottom
         const t = i / numPoints;
@@ -107,10 +179,10 @@ function createSphericalCapForRecess(baseRadius, recessDepth) {
     // Ensure we reach the center bottom
     points.push(new THREE.Vector2(0, -h));
     
-    // Calculate segments for good resolution
+    // Calculate lathe segments based on target linear resolution
     const circumference = 2 * Math.PI * a;
-    const targetResolution = 0.2; // mm
-    const segments = Math.max(16, Math.min(48, Math.round(circumference / targetResolution)));
+    const targetResolution = cfg.latheTargetResolutionMm; // mm
+    const segments = Math.max(cfg.latheMinSegments, Math.min(cfg.latheMaxSegments, Math.round(circumference / targetResolution)));
     
     // Create the geometry using LatheGeometry
     const geometry = new THREE.LatheGeometry(points, segments);
@@ -124,7 +196,8 @@ function createSphericalCapForRecess(baseRadius, recessDepth) {
         sphereRadius: R,
         sphereCenterOffset: centerOffset,
         segments: segments,
-        profilePoints: points.length
+        profilePoints: points.length,
+        targetResolution
     });
 
     return {
@@ -135,29 +208,48 @@ function createSphericalCapForRecess(baseRadius, recessDepth) {
 }
 
 function createRecessDotGeometry(settings) {
-    // Creates simple hemispherical recesses using icospheres
-    // This matches the working upstream implementation approach
+    // Creates recess dot geometry based on selected shape
+    // Default: simple hemispherical recess using icosphere (robust for CSG)
+    
+    const recessShape = (settings.counter_plate_recess_shape || 'hemisphere').toString().toLowerCase();
     
     // Counter plate recess parameters
     const embossCylinderDiameter = toNumber(settings.emboss_dot_cylinder_diameter || settings.emboss_dot_base_diameter, 1.5);
     const offset = toNumber(settings.counter_plate_dot_size_offset, 0.0);
     
     // Use counter plate specific parameters if provided
-    const openingDiameter = settings.counter_plate_dot_cylinder_diameter && settings.counter_plate_dot_cylinder_diameter.trim() !== '' 
+    const openingDiameter = settings.counter_plate_dot_cylinder_diameter && String(settings.counter_plate_dot_cylinder_diameter).trim() !== '' 
         ? toNumber(settings.counter_plate_dot_cylinder_diameter, embossCylinderDiameter + offset)
         : embossCylinderDiameter + offset;
     
     const baseRadius = openingDiameter / 2;
     
-    // Create simple icosphere (hemisphere) - much more reliable than compound geometry
-    // Calculate appropriate resolution for manifold geometry
+    if (recessShape === 'spherical_cap') {
+        // Use spherical cap with explicit recess depth (fallback to hemisphere radius)
+        const recessDepth = Math.max(0.05, toNumber(settings.counter_plate_dot_cylinder_height, baseRadius));
+        const cap = createSphericalCapForRecess(baseRadius, recessDepth, settings);
+        console.log('Counter plate recess (spherical cap):', {
+            openingDiameter,
+            baseRadius,
+            recessDepth,
+            geometryType: 'SPHERICAL_CAP'
+        });
+        return {
+            geometry: cap.geometry,
+            totalHeight: recessDepth,
+            cylinderRadius: baseRadius,
+            sphereRadius: cap.radius,
+            centerOffset: cap.centerOffset,
+            cylinderHeight: 0
+        };
+    }
+    
+    // Default hemisphere
+    const cfg = getResolutionConfig(settings);
     const circumference = 2 * Math.PI * baseRadius;
-    const targetResolution = 0.15; // mm
-    const radialSegments = Math.max(12, Math.min(48, Math.round(circumference / targetResolution)));
-    
-    // Create icosphere that will be positioned with equator at surface level
+    const targetResolution = cfg.dotTargetResolutionMm; // mm
+    const radialSegments = Math.max(cfg.hemisphereMinSegments, Math.min(cfg.hemisphereMaxSegments, Math.round(circumference / targetResolution)));
     const sphereGeom = new THREE.SphereGeometry(baseRadius, radialSegments, radialSegments);
-    
     console.log('Counter plate hemispherical recess dimensions:', {
         openingDiameter,
         baseRadius,
@@ -168,14 +260,13 @@ function createRecessDotGeometry(settings) {
         geometryType: 'ICOSPHERE (HEMISPHERE)',
         shapeDescription: 'Simple icosphere positioned with equator at surface for clean subtraction'
     });
-    
     return { 
         geometry: sphereGeom, 
-        totalHeight: baseRadius, // Hemisphere height is just the radius
+        totalHeight: baseRadius,
         cylinderRadius: baseRadius,
         sphereRadius: baseRadius,
         centerOffset: 0,
-        cylinderHeight: 0 // No cylinder part in simple hemisphere
+        cylinderHeight: 0
     };
 }
 
@@ -186,9 +277,10 @@ function createDotGeometry(settings) {
     const domeHeight = toNumber(settings.emboss_dot_dome_height || 0.5, 0.5);
     
     // Calculate appropriate resolution for manifold geometry
+    const cfg = getResolutionConfig(settings);
     const circumference = Math.PI * cylinderDiameter;
-    const targetResolution = 0.15; // mm
-    const radialSegments = Math.max(12, Math.min(32, Math.round(circumference / targetResolution)));
+    const targetResolution = cfg.dotTargetResolutionMm; // mm
+    const radialSegments = Math.max(cfg.dotMinSegments, Math.min(cfg.dotMaxSegments, Math.round(circumference / targetResolution)));
     
     // Create cylinder base (the "pole" part)
     const cylinderRadius = Math.max(0, cylinderDiameter / 2);
@@ -375,6 +467,7 @@ function createBasePlateGeometry(settings) {
 export function buildCardEmbossingPlate(translatedLines, settings) {
     const group = new THREE.Group();
     const material = new THREE.MeshBasicMaterial();
+    const evaluator = new Evaluator();
 
     // Debug mode check
     const debugTriangleOnly = settings.debug_triangle_only || false;
@@ -383,18 +476,78 @@ export function buildCardEmbossingPlate(translatedLines, settings) {
         console.log('DEBUG MODE: Triangle indicators only for card embossing plate');
     }
 
-    // Base plate
+    // Base plate (as CSG brush so we can subtract indicators)
     const baseGeom = createBasePlateGeometry(settings);
-    const baseMesh = new THREE.Mesh(baseGeom, material);
-    baseMesh.position.set(
+    const baseBrush = new Brush(baseGeom, material);
+    baseBrush.position.set(
         toNumber(settings.card_width, 86) / 2,
         toNumber(settings.card_height, 54) / 2,
         toNumber(settings.card_thickness, 1.6) / 2
     );
-    group.add(baseMesh);
+    baseBrush.updateMatrixWorld(true);
+
+    // Add recessed indicators (rectangle at start-of-row, triangle at end-of-row)
+    const subtractBrushes = [];
+    const dotSpacing = toNumber(settings.dot_spacing, 2.54);
+    const rectWidth = dotSpacing;
+    const rectHeight = 2 * dotSpacing;
+    const triBaseHeight = 2 * dotSpacing;
+    const triWidth = dotSpacing;
+    const leftMargin = toNumber(settings.left_margin, 8);
+    const topMargin = toNumber(settings.top_margin, 8);
+    const cellSpacing = toNumber(settings.cell_spacing, 6.0);
+    const lineSpacing = toNumber(settings.line_spacing, 10.0);
+    const xAdjust = toNumber(settings.braille_x_adjust, 0);
+    const leftMarginOverride = toNumber(settings.left_margin, 8);
+    const topMarginOverride = toNumber(settings.top_margin, 8);
+    const yAdjust = toNumber(settings.braille_y_adjust, 0);
+    const availableColumns = getAvailableColumns(settings);
+    const gridRows = getGridRows(settings);
+    const t = toNumber(settings.card_thickness, 1.6);
+    const recessDepth = Math.min(0.8, Math.max(0.2, toNumber(settings.indicator_recess_depth, 0.5)));
+
+    const includeIndicators = (settings.indicator_shape || 'standard').toString().toLowerCase() !== 'none';
+    for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
+        const yPos = toNumber(settings.card_height, 54) - (topMarginOverride || topMargin) - (rowIdx * lineSpacing) + yAdjust;
+        // Start-of-row rectangle: positioned at the left of first cell
+        if (!debugTriangleOnly && includeIndicators) {
+            const rectShape = createRectangleShape(rectWidth, rectHeight);
+            const rectGeom = new THREE.ExtrudeGeometry(rectShape, { depth: recessDepth, bevelEnabled: false });
+            const rectBrush = new Brush(rectGeom, material);
+            const xCellStart = (leftMarginOverride || leftMargin) + xAdjust - dotSpacing;
+            const effectiveIndicatorDepth = Math.min(recessDepth, t * 0.8);
+            rectBrush.position.set(xCellStart, yPos, t - effectiveIndicatorDepth);
+            rectBrush.updateMatrixWorld(true);
+            subtractBrushes.push(rectBrush);
+        }
+        // End-of-row triangle: positioned at the right of last cell, pointing right
+        if (includeIndicators) {
+            const triShape = createTriangleShape(triBaseHeight, triWidth);
+            const triGeom = new THREE.ExtrudeGeometry(triShape, { depth: recessDepth, bevelEnabled: false });
+            const triBrush = new Brush(triGeom, material);
+            const xCellEnd = (leftMarginOverride || leftMargin) + ((availableColumns + 1) * cellSpacing) + xAdjust;
+            const effectiveIndicatorDepth = Math.min(recessDepth, t * 0.8);
+            triBrush.position.set(xCellEnd, yPos, t - effectiveIndicatorDepth);
+            triBrush.updateMatrixWorld(true);
+            subtractBrushes.push(triBrush);
+        }
+    }
+
+    // Subtract indicators from base with fallback
+    let resultBrush = baseBrush;
+    if (subtractBrushes.length > 0) {
+        const unionSubtract = balancedUnion(evaluator, subtractBrushes);
+        if (unionSubtract) {
+            resultBrush = evaluator.evaluate(baseBrush, unionSubtract, SUBTRACTION);
+            resultBrush.updateMatrixWorld(true);
+        } else {
+            console.warn('balancedUnion failed; performing sequential subtraction for card embossing plate');
+            resultBrush = subtractSequential(evaluator, baseBrush, subtractBrushes);
+        }
+    }
+    group.add(resultBrush);
 
     // Dot positioning constants
-    const dotSpacing = toNumber(settings.dot_spacing, 2.54);
     const dotColOffsets = [-dotSpacing / 2, dotSpacing / 2];
     const dotRowOffsets = [dotSpacing, 0, -dotSpacing];
     const dotIndexToRowCol = [
@@ -402,19 +555,13 @@ export function buildCardEmbossingPlate(translatedLines, settings) {
         [0, 1], [1, 1], [2, 1]  // dots 4,5,6 right column
     ];
 
-    const leftMargin = toNumber(settings.left_margin, 8);
-    const topMargin = toNumber(settings.top_margin, 8);
-    const cellSpacing = toNumber(settings.cell_spacing, 6.0);
-    const lineSpacing = toNumber(settings.line_spacing, 10.0);
+    
     const cylinderHeight = toNumber(settings.emboss_dot_cylinder_height || settings.emboss_dot_height, 0.1);
     const domeHeight = toNumber(settings.emboss_dot_dome_height || 0.5, 0.5);
     const totalDotHeight = cylinderHeight + domeHeight;
     // Position dots so their base sits on the card surface
     const zTop = toNumber(settings.card_thickness, 1.6);
-    const xAdjust = toNumber(settings.braille_x_adjust, 0);
-    const yAdjust = toNumber(settings.braille_y_adjust, 0);
-    const availableColumns = getAvailableColumns(settings);
-    const gridRows = getGridRows(settings);
+    
 
     const dotGeom = createDotGeometry(settings);
 
@@ -422,12 +569,12 @@ export function buildCardEmbossingPlate(translatedLines, settings) {
     if (!debugTriangleOnly) {
         for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
             const brailleText = (translatedLines[rowIdx] || '').slice(0, availableColumns);
-            const yPos = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust;
+            const yPos = toNumber(settings.card_height, 54) - (topMarginOverride || topMargin) - (rowIdx * lineSpacing) + yAdjust;
 
             for (let col = 0; col < brailleText.length; col++) {
                 const ch = brailleText[col];
                 const dots = brailleUnicodeToDots(ch);
-                const xCell = leftMargin + ((col + 1) * cellSpacing) + xAdjust;
+                const xCell = (leftMarginOverride || leftMargin) + ((col + 1) * cellSpacing) + xAdjust;
 
                 for (let i = 0; i < 6; i++) {
                     if (!dots[i]) continue;
@@ -467,10 +614,11 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
     const radius = diameter / 2;
     const thetaOffset = seamOffsetDeg * Math.PI / 180;
 
-    // Base cylinder oriented along Z (match backend STL orientation) with optimized resolution
+    // Base cylinder oriented along Z (match backend STL orientation) with configurable resolution
+    const cfgCyl = getResolutionConfig(settings);
     const embossCircumference = 2 * Math.PI * radius;
-    const targetResolution = 0.15; // mm
-    const radialSegments = Math.max(32, Math.min(128, Math.round(embossCircumference / targetResolution)));
+    const targetResolution = cfgCyl.cylinderTargetResolutionMm; // mm
+    const radialSegments = Math.max(cfgCyl.cylinderMinSegments, Math.min(cfgCyl.cylinderMaxSegments, Math.round(embossCircumference / targetResolution)));
     
     const cylGeometry = new THREE.CylinderGeometry(radius, radius, height, radialSegments, 1, false);
     cylGeometry.rotateX(Math.PI / 2);
@@ -526,6 +674,8 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
     const zCenterOffset = -height / 2;
     const rowsSpan = (gridRows - 1) * lineSpacing;
     const recessDepth = Math.min(0.8, Math.max(0.2, toNumber(settings.indicator_recess_depth, 0.5)));
+    const placementMode = (settings.placement_mode || 'auto').toString().toLowerCase();
+    const manualOffsets = parseManualOffsets(settings, gridRows);
 
     function orientRadial(mesh, theta, zWorld, radialDistance) {
         const rHat = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
@@ -537,14 +687,16 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
         mesh.updateMatrixWorld(true);
     }
 
+    const includeIndicators = (settings.indicator_shape || 'standard').toString().toLowerCase() !== 'none';
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
-        // Place indicators centered on row line
-        const yLocal = (height / 2) + yAdjust + (rowsSpan / 2 - rowIdx * lineSpacing);
+        // Place indicators centered on row line (or shifted if manual)
+        const manualShift = placementMode === 'manual' ? manualOffsets[rowIdx] || 0 : 0;
+        const yLocal = (height / 2) + yAdjust + (rowsSpan / 2 - rowIdx * lineSpacing) + manualShift;
         const zLocal = yLocal + zCenterOffset;
 
         // Start-of-row rectangle
         // Skip rectangle if in debug triangle mode
-        if (!debugTriangleOnly) {
+        if (!debugTriangleOnly && includeIndicators) {
             const shape = createRectangleShape(rectWidth, rectHeight);
             const geom = new THREE.ExtrudeGeometry(shape, { depth: recessDepth, bevelEnabled: false });
             const brush = new Brush(geom, material);
@@ -556,7 +708,7 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
         }
 
         // End-of-row triangle (apex points along +theta)
-        {
+        if (includeIndicators) {
             const triShape = createTriangleShape(triBaseHeight, triWidth);
             const triGeom = new THREE.ExtrudeGeometry(triShape, { depth: recessDepth, bevelEnabled: false });
             
@@ -598,7 +750,7 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
 
     // Evaluate base minus all subtractive features (cutout + indicators)
     const unionSubtract = balancedUnion(evaluator, subtractBrushes);
-    const result = unionSubtract ? evaluator.evaluate(baseBrush, unionSubtract, SUBTRACTION) : baseBrush;
+    const result = unionSubtract ? evaluator.evaluate(baseBrush, unionSubtract, SUBTRACTION) : subtractSequential(evaluator, baseBrush, subtractBrushes);
     result.updateMatrixWorld(true);
     group.add(result);
 
@@ -650,43 +802,79 @@ export function buildCylinderEmbossingPlate(translatedLines, settings, cylinderP
 // --- Helpers ---
 function balancedUnion(evaluator, brushes) {
     if (!brushes || brushes.length === 0) return null;
-    console.log(`Starting balanced union with ${brushes.length} brushes`);
+    // Remove null/undefined entries defensively
+    let level = brushes.filter(Boolean);
+    if (level.length === 0) return null;
+    console.log(`Starting balanced union with ${level.length} brushes`);
     
     // Add small random offsets to avoid exact overlaps that cause CSG issues
     const epsilon = 1e-6; // Very small offset in mm
-    brushes.forEach((brush, index) => {
+    level.forEach((brush) => {
         if (brush && brush.position) {
-            // Add tiny random offset to break exact alignments
             brush.position.x += (Math.random() - 0.5) * epsilon;
-            brush.position.y += (Math.random() - 0.5) * epsilon; 
+            brush.position.y += (Math.random() - 0.5) * epsilon;
             brush.position.z += (Math.random() - 0.5) * epsilon;
             brush.updateMatrixWorld(true);
         }
     });
     
-    let level = brushes.slice();
     let iteration = 0;
     while (level.length > 1) {
         const next = [];
+        let unionsSucceeded = 0;
         for (let i = 0; i < level.length; i += 2) {
             if (i + 1 < level.length) {
-                const united = evaluator.evaluate(level[i], level[i + 1], ADDITION);
-                if (!united) {
-                    console.error(`Failed to unite brushes ${i} and ${i+1} in iteration ${iteration}`);
-                } else {
-                    // Ensure updated matrix for next iteration
-                    united.updateMatrixWorld(true);
+                let united = null;
+                try {
+                    united = evaluator.evaluate(level[i], level[i + 1], ADDITION);
+                } catch (err) {
+                    console.error(`Exception uniting brushes ${i} and ${i+1} at iteration ${iteration}:`, err);
                 }
-                next.push(united);
-            } else {
+                if (united) {
+                    unionsSucceeded++;
+                    united.updateMatrixWorld(true);
+                    next.push(united);
+                } else {
+                    // Fallback: push original brushes forward to try again / or for sequential subtraction later
+                    if (level[i]) next.push(level[i]);
+                    if (level[i + 1]) next.push(level[i + 1]);
+                }
+            } else if (level[i]) {
                 next.push(level[i]);
             }
         }
-        level = next;
+        // If no unions succeeded this round, avoid infinite loop
+        if (unionsSucceeded === 0) {
+            console.warn(`Balanced union could not merge any pairs at iteration ${iteration}. Returning null to trigger fallback.`);
+            return null;
+        }
+        level = next.filter(Boolean);
         iteration++;
     }
     console.log(`Balanced union completed after ${iteration} iterations`);
-    return level[0];
+    return level[0] || null;
+}
+
+// Fallback: sequentially subtract each brush from the base
+function subtractSequential(evaluator, baseBrush, brushes) {
+    if (!brushes || brushes.length === 0) return baseBrush;
+    let current = baseBrush;
+    for (let i = 0; i < brushes.length; i++) {
+        const b = brushes[i];
+        if (!b) continue;
+        try {
+            const next = evaluator.evaluate(current, b, SUBTRACTION);
+            if (next) {
+                current = next;
+                current.updateMatrixWorld(true);
+            } else {
+                console.warn(`Sequential subtract returned null at index ${i}; keeping previous result`);
+            }
+        } catch (err) {
+            console.error(`Exception during sequential subtract at index ${i}:`, err);
+        }
+    }
+    return current;
 }
 
 function createTriangleShape(baseHeight, triangleWidth) {
@@ -821,12 +1009,13 @@ export function buildCardCounterPlate(settings) {
     const triBaseHeight = 2 * dotSpacing;
     const triWidth = dotSpacing;
 
+    const includeIndicators = (settings.indicator_shape || 'standard').toString().toLowerCase() !== 'none';
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
         const yPos = toNumber(settings.card_height, 54) - topMargin - (rowIdx * lineSpacing) + yAdjust;
 
         // Start-of-row rectangle: positioned at the left of first cell
         // Skip rectangle if in debug triangle mode
-        if (!debugTriangleOnly) {
+        if (!debugTriangleOnly && includeIndicators) {
             const shape = createRectangleShape(rectWidth, rectHeight);
             const geom = new THREE.ExtrudeGeometry(shape, { depth: recessDepth, bevelEnabled: false });
             const brush = new Brush(geom, material);
@@ -838,7 +1027,7 @@ export function buildCardCounterPlate(settings) {
         }
 
         // End-of-row triangle: positioned at the right of last cell, pointing right
-        {
+        if (includeIndicators) {
             const shape = createTriangleShape(triBaseHeight, triWidth);
             
             // Debug logging for triangle parameters
@@ -873,18 +1062,21 @@ export function buildCardCounterPlate(settings) {
 
     console.log(`Card counter plate: ${subtractBrushes.length} subtract brushes created`);
     
-    // For single brush test, skip union
-    let subtractBrush;
+    // For single brush test, skip union; otherwise fallback to sequential subtract
+    let result;
     if (subtractBrushes.length === 1) {
         console.log('Single brush test - skipping union');
-        subtractBrush = subtractBrushes[0];
+        result = evaluator.evaluate(baseBrush, subtractBrushes[0], SUBTRACTION);
     } else {
         const unionSubtract = balancedUnion(evaluator, subtractBrushes);
         console.log('Card plate union subtract result:', unionSubtract ? 'Created' : 'NULL');
-        subtractBrush = unionSubtract;
+        if (unionSubtract) {
+            result = evaluator.evaluate(baseBrush, unionSubtract, SUBTRACTION);
+        } else {
+            console.warn('balancedUnion failed; performing sequential subtraction for card counter plate');
+            result = subtractSequential(evaluator, baseBrush, subtractBrushes);
+        }
     }
-    
-    const result = subtractBrush ? evaluator.evaluate(baseBrush, subtractBrush, SUBTRACTION) : baseBrush;
     console.log('Card plate CSG subtraction result:', result ? 'Success' : 'Failed');
     
     if (result) {
@@ -922,10 +1114,11 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const radius = diameter / 2;
     const thetaOffset = toNumber(cylinderParams.seam_offset_deg, 355) * Math.PI / 180;
 
-    // Base cylinder brush (axis along Z) with optimized resolution for manifold geometry
+    // Base cylinder brush (axis along Z) with configurable resolution
+    const cfgCyl = getResolutionConfig(settings);
     const counterCircumference = 2 * Math.PI * radius;
-    const targetResolution = 0.15; // mm
-    const radialSegments = Math.max(32, Math.min(128, Math.round(counterCircumference / targetResolution)));
+    const targetResolution = cfgCyl.cylinderTargetResolutionMm; // mm
+    const radialSegments = Math.max(cfgCyl.cylinderMinSegments, Math.min(cfgCyl.cylinderMaxSegments, Math.round(counterCircumference / targetResolution)));
     
     const cylGeometry = new THREE.CylinderGeometry(radius, radius, height, radialSegments, 1, false);
     cylGeometry.rotateX(Math.PI / 2);
@@ -945,6 +1138,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
 
     // Optional polygonal cutout (12-gon), subtract along cylinder axis (Z), rotated to seam offset
     const cutoutInscribed = toNumber(cylinderParams.polygonal_cutout_radius_mm, 0);
+    const cutoutSides = Math.max(3, Math.min(20, toNumber(cylinderParams.polygonal_cutout_sides, 12)));
     // Skip cutout if in debug triangle mode
     if (cutoutInscribed > 0 && !debugTriangleOnly) {
         const sides = cutoutSides;
@@ -1012,6 +1206,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     const triBaseHeight = 2 * dotSpacing;
     const triWidth = dotSpacing;
 
+    const includeIndicators = (settings.indicator_shape || 'standard').toString().toLowerCase() !== 'none';
     for (let rowIdx = 0; rowIdx < gridRows; rowIdx++) {
         const yLocal = (height / 2) + yAdjust + (rowsSpan / 2 - rowIdx * lineSpacing);
         const zLocal = yLocal + zCenterOffset;
@@ -1054,7 +1249,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
 
         // Start-of-row rectangle positioned at the left of first cell
         // Skip rectangle if in debug triangle mode
-        if (!debugTriangleOnly) {
+        if (!debugTriangleOnly && includeIndicators) {
             const rectShape = createRectangleShape(rectWidth, rectHeight);
             const rectGeom = new THREE.ExtrudeGeometry(rectShape, { depth: recessDepth, bevelEnabled: false });
             const rectBrush = new Brush(rectGeom, material);
@@ -1066,7 +1261,7 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
         }
 
         // End-of-row triangle positioned at the right of last cell, pointing right
-        {
+        if (includeIndicators) {
             const triShape = createTriangleShape(triBaseHeight, triWidth);
             
             // Debug logging for triangle parameters
@@ -1110,18 +1305,21 @@ export function buildCylinderCounterPlate(settings, cylinderParams = {}) {
     console.log('Grid settings:', { availableColumns, gridRows, cellSpacing, lineSpacing, dotSpacing });
     console.log('Recess total height:', recessTotalHeight, 'mm');
     
-    // For single brush test, skip union
-    let subtractBrush;
+    // For single brush test, skip union; otherwise fallback to sequential subtract
+    let result;
     if (subtractBrushes.length === 1) {
         console.log('Single brush test - skipping union');
-        subtractBrush = subtractBrushes[0];
+        result = evaluator.evaluate(baseBrush, subtractBrushes[0], SUBTRACTION);
     } else {
         const unionSubtract = balancedUnion(evaluator, subtractBrushes);
         console.log('Union subtract result:', unionSubtract ? 'Created' : 'NULL');
-        subtractBrush = unionSubtract;
+        if (unionSubtract) {
+            result = evaluator.evaluate(baseBrush, unionSubtract, SUBTRACTION);
+        } else {
+            console.warn('balancedUnion failed; performing sequential subtraction for cylinder counter plate');
+            result = subtractSequential(evaluator, baseBrush, subtractBrushes);
+        }
     }
-    
-    const result = subtractBrush ? evaluator.evaluate(baseBrush, subtractBrush, SUBTRACTION) : baseBrush;
     console.log('CSG subtraction result:', result ? 'Success' : 'Failed');
     
     if (result) {

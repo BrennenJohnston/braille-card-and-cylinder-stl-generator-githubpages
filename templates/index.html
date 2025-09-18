@@ -1658,8 +1658,16 @@
                         <div class="expert-info" role="note" aria-label="Expert mode information">
                             Any changes made here will affect both plates.
                         </div>
+                        <!-- Reset settings and preview controls -->
                         <div class="grade-selection">
-                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Braille Dimensions</label>
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Utilities</label>
+                            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                <button type="button" id="reset-settings-btn" title="Reset all settings to defaults">Reset all settings to default</button>
+                                <button type="button" id="preview-braille-btn">Preview Braille Translation</button>
+                            </div>
+                        </div>
+                        <div class="grade-selection">
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Braille Spacing</label>
                             <div>
                                 <label for="grid_columns" id="grid_columns_label">Number of Braille Cells (Characters):</label>
                                 <input type="number" id="grid_columns" name="grid_columns" value="12">
@@ -1683,10 +1691,25 @@
                                 <label for="dot_spacing">Braille Dot Spacing:</label>
                                 <input type="number" id="dot_spacing" name="dot_spacing" value="2.5" step="0.1">
                             </div>
+                            <div>
+                                <label for="left_margin">Left Margin (mm):</label>
+                                <input type="number" id="left_margin" name="left_margin" value="8" step="0.1">
+                            </div>
+                            <div>
+                                <label for="top_margin">Top Margin (mm):</label>
+                                <input type="number" id="top_margin" name="top_margin" value="8" step="0.1">
+                            </div>
                         </div>
 
                         <div class="grade-selection">
-                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Dot Dimensions</label>
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Braille Dot Adjustments</label>
+                            <div>
+                                <label for="dot_shape">Select Braille Dot Shape:</label>
+                                <select id="dot_shape" name="dot_shape">
+                                    <option value="rounded" selected>Rounded (cylinder + dome)</option>
+                                    <option value="cone">Cone</option>
+                                </select>
+                            </div>
                             <div>
                                 <label for="emboss_dot_cylinder_diameter">Cylinder Base Diameter (mm):</label>
                                 <input type="number" id="emboss_dot_cylinder_diameter" name="emboss_dot_cylinder_diameter" value="1.5" step="0.1">
@@ -1699,10 +1722,23 @@
                                 <label for="emboss_dot_dome_height">Dome Height (mm):</label>
                                 <input type="number" id="emboss_dot_dome_height" name="emboss_dot_dome_height" value="0.5" step="0.1">
                             </div>
+                            <div id="cone-dot-dimensions" style="display:none;">
+                                <label for="cone_dot_base_diameter">Cone Dot Base Diameter (mm):</label>
+                                <input type="number" id="cone_dot_base_diameter" name="cone_dot_base_diameter" value="1.5" step="0.1">
+                                <label for="cone_dot_height">Cone Dot Height (mm):</label>
+                                <input type="number" id="cone_dot_height" name="cone_dot_height" value="0.6" step="0.1">
+                            </div>
                         </div>
 
                         <div class="grade-selection">
                             <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Counter Dot Dimensions</label>
+                            <div>
+                                <label for="counter_plate_recess_shape">Select Braille Dot Recess Shape:</label>
+                                <select id="counter_plate_recess_shape" name="counter_plate_recess_shape">
+                                    <option value="hemisphere" selected>Hemisphere</option>
+                                    <option value="spherical_cap">Spherical Cap</option>
+                                </select>
+                            </div>
                             <div>
                                 <label for="counter_plate_dot_cylinder_diameter">Counter Dot Cylinder Diameter (mm):</label>
                                 <input type="number" id="counter_plate_dot_cylinder_diameter" name="counter_plate_dot_cylinder_diameter" value="1.5" step="0.1" placeholder="Default: 1.5" title="Recessed dot cylinder base diameter">
@@ -1728,10 +1764,18 @@
                                     Performance Mode (faster generation with simpler geometry)
                                 </label>
                             </div>
+                            <div style="margin-top: 10px;">
+                                <label for="quality">Quality:</label>
+                                <select id="quality" name="quality">
+                                    <option value="draft" selected>Draft (fastest)</option>
+                                    <option value="standard">Standard</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div class="grade-selection">
-                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Plate Dimensions</label>
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Surface Dimensions</label>
                             <div>
                                 <label for="card_width">Plate Width (mm):</label>
                                 <input type="number" id="card_width" name="card_width" value="90" step="0.1">
@@ -1747,7 +1791,7 @@
                         </div>
 
                         <div class="grade-selection">
-                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Cylinder Dimensions</label>
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Shape Selection</label>
                             <div>
                                 <label for="cylinder_diameter_mm">Cylinder Diameter (mm):</label>
                                 <input type="number" id="cylinder_diameter_mm" name="cylinder_diameter_mm" value="31.35" step="0.1" min="10" max="200">
@@ -1770,13 +1814,29 @@
                                     Rotates the starting position of braille text around the cylinder
                                 </div>
                             </div>
+                            <div>
+                                <label for="cylinder_polygonal_cutout_sides">Polygonal Cutout Sides:</label>
+                                <input type="number" id="cylinder_polygonal_cutout_sides" name="cylinder_polygonal_cutout_sides" value="12" step="1" min="3" max="20">
+                            </div>
                             <div id="cylinder-overflow-warning" class="grade-note" style="margin-top: 10px; color: #d73502; display: none;">
                                 <strong>Warning:</strong> <span id="cylinder-overflow-message"></span>
                             </div>
                         </div>
 
                         <div class="grade-selection">
-                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Braille / Card Positioning</label>
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Placement Mode</label>
+                            <div>
+                                <label for="placement_mode">Mode:</label>
+                                <select id="placement_mode" name="placement_mode">
+                                    <option value="auto" selected>Auto Placement</option>
+                                    <option value="manual">Manual Placement (per-line)</option>
+                                </select>
+                            </div>
+                            <div id="manual-placement" style="display:none; margin-top:8px;">
+                                <label for="manual_start_offsets">Manual line start offsets (mm, JSON array of length grid_rows):</label>
+                                <input type="text" id="manual_start_offsets" name="manual_start_offsets" placeholder='e.g., [0,0,0,0]' value="[0,0,0,0]" />
+                            </div>
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700; margin-top: 10px;">Braille / Card Positioning</label>
                             <div>
                                 <label for="braille_y_adjust">Y Adjust:</label>
                                 <input type="number" id="braille_y_adjust" name="braille_y_adjust" value="0.0" step="0.1">
@@ -1784,6 +1844,13 @@
                             <div>
                                 <label for="braille_x_adjust">X Adjust:</label>
                                 <input type="number" id="braille_x_adjust" name="braille_x_adjust" value="0.0" step="0.1">
+                            </div>
+                            <div>
+                                <label for="indicator_shape">Indicator Shape:</label>
+                                <select id="indicator_shape" name="indicator_shape">
+                                    <option value="standard" selected>Standard (rectangle + triangle)</option>
+                                    <option value="none">None</option>
+                                </select>
                             </div>
                         </div>
 
@@ -2540,21 +2607,27 @@
                 'emboss_dot_cylinder_diameter',
                 'emboss_dot_cylinder_height', 
                 'emboss_dot_dome_height',
+            'cone_dot_base_diameter',
+            'cone_dot_height',
                 'counter_plate_dot_cylinder_diameter',
                 'counter_plate_dot_cylinder_height',
                 'counter_plate_dot_dome_height',
                 'counter_plate_dot_size_offset',
+                'quality',
                 'grid_columns',
                 'grid_rows',
                 'cell_spacing',
                 'line_spacing',
                 'dot_spacing',
+            'left_margin',
+            'top_margin',
                 'card_width',
                 'card_height',
                 'card_thickness',
                 'braille_x_adjust',
                 'braille_y_adjust',
-                'indicator_recess_depth'
+            'indicator_recess_depth',
+            'cylinder_polygonal_cutout_sides'
             ];
             
             expertInputs.forEach(inputId => {
@@ -2575,6 +2648,64 @@
                     }
                 });
             }
+
+        // Dot shape toggle (show cone dimensions if cone selected)
+        const dotShapeSelect = document.getElementById('dot_shape');
+        const coneDims = document.getElementById('cone-dot-dimensions');
+        if (dotShapeSelect && coneDims) {
+            dotShapeSelect.addEventListener('change', () => {
+                coneDims.style.display = dotShapeSelect.value === 'cone' ? 'block' : 'none';
+                resetToGenerateState();
+            });
+        }
+
+        // Placement mode UI
+        const placementMode = document.getElementById('placement_mode');
+        const manualPlacement = document.getElementById('manual-placement');
+        const manualOffsets = document.getElementById('manual_start_offsets');
+        if (placementMode && manualPlacement) {
+            placementMode.addEventListener('change', () => {
+                manualPlacement.style.display = placementMode.value === 'manual' ? 'block' : 'none';
+                resetToGenerateState();
+            });
+        }
+        if (manualOffsets) {
+            manualOffsets.addEventListener('input', resetToGenerateState);
+        }
+
+        // Indicator shape
+        const indicatorShape = document.getElementById('indicator_shape');
+        if (indicatorShape) {
+            indicatorShape.addEventListener('change', resetToGenerateState);
+        }
+
+        // Reset settings
+        const resetBtn = document.getElementById('reset-settings-btn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                const defaults = {
+                    grid_columns: '12', grid_rows: '4', cell_spacing: '6.5', line_spacing: '10.0', dot_spacing: '2.5',
+                    left_margin: '8', top_margin: '8',
+                    emboss_dot_cylinder_diameter: '1.5', emboss_dot_cylinder_height: '0.1', emboss_dot_dome_height: '0.5',
+                    cone_dot_base_diameter: '1.5', cone_dot_height: '0.6', dot_shape: 'rounded',
+                    counter_plate_dot_cylinder_diameter: '1.5', counter_plate_dot_cylinder_height: '0.1', counter_plate_dot_dome_height: '0.5',
+                    counter_plate_dot_size_offset: '0.0', counter_plate_recess_shape: 'hemisphere',
+                    card_width: '90', card_height: '52', card_thickness: '2.0',
+                    cylinder_diameter_mm: '31.35', cylinder_height_mm: '52', cylinder_polygonal_cutout_radius_mm: '13', cylinder_polygonal_cutout_sides: '12', seam_offset_deg: '355',
+                    braille_x_adjust: '0.0', braille_y_adjust: '0.0', indicator_recess_depth: '0.5',
+                    placement_mode: 'auto', manual_start_offsets: '[0,0,0,0]', indicator_shape: 'standard',
+                    quality: 'draft'
+                };
+                Object.entries(defaults).forEach(([id, val]) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    if (el.tagName === 'SELECT') el.value = val; else el.value = val;
+                });
+                if (manualPlacement) manualPlacement.style.display = 'none';
+                if (coneDims) coneDims.style.display = 'none';
+                resetToGenerateState();
+            });
+        }
             
             // Cylinder parameter inputs
             const cylinderInputs = [
@@ -3013,21 +3144,31 @@
                 cell_spacing: document.getElementById('cell_spacing').value,
                 line_spacing: document.getElementById('line_spacing').value,
                 dot_spacing: document.getElementById('dot_spacing').value,
+                left_margin: document.getElementById('left_margin').value,
+                top_margin: document.getElementById('top_margin').value,
                 emboss_dot_cylinder_diameter: document.getElementById('emboss_dot_cylinder_diameter').value,
                 emboss_dot_cylinder_height: document.getElementById('emboss_dot_cylinder_height').value,
                 emboss_dot_dome_height: document.getElementById('emboss_dot_dome_height').value,
+                dot_shape: document.getElementById('dot_shape').value,
+                cone_dot_base_diameter: document.getElementById('cone_dot_base_diameter')?.value || '',
+                cone_dot_height: document.getElementById('cone_dot_height')?.value || '',
                 counter_plate_dot_cylinder_diameter: document.getElementById('counter_plate_dot_cylinder_diameter').value,
                 counter_plate_dot_cylinder_height: document.getElementById('counter_plate_dot_cylinder_height').value,
                 counter_plate_dot_dome_height: document.getElementById('counter_plate_dot_dome_height').value,
+                counter_plate_recess_shape: document.getElementById('counter_plate_recess_shape').value,
                 counter_plate_dot_size_offset: document.getElementById('counter_plate_dot_size_offset').value,
                 performance_mode: document.getElementById('performance_mode').checked,
+                quality: (document.getElementById('quality')?.value || 'draft'),
                 debug_triangle_only: document.getElementById('debug_triangle_only').checked,
                 indicator_recess_depth: document.getElementById('indicator_recess_depth').value,
                 card_width: document.getElementById('card_width').value,
                 card_height: document.getElementById('card_height').value,
                 card_thickness: document.getElementById('card_thickness').value,
                 braille_x_adjust: document.getElementById('braille_x_adjust').value,
-                braille_y_adjust: document.getElementById('braille_y_adjust').value
+                braille_y_adjust: document.getElementById('braille_y_adjust').value,
+                placement_mode: document.getElementById('placement_mode').value,
+                manual_start_offsets: document.getElementById('manual_start_offsets').value,
+                indicator_shape: document.getElementById('indicator_shape').value
             };
             
             // Debug: Log the settings being sent
@@ -3082,6 +3223,7 @@
                     diameter_mm: document.getElementById('cylinder_diameter_mm').value,
                     height_mm: document.getElementById('cylinder_height_mm').value,
                     polygonal_cutout_radius_mm: document.getElementById('cylinder_polygonal_cutout_radius_mm').value,
+                    polygonal_cutout_sides: document.getElementById('cylinder_polygonal_cutout_sides').value,
                     seam_offset_deg: document.getElementById('seam_offset_deg').value
                 };
             }
@@ -3130,6 +3272,9 @@
                 }
                 // Yield once for UI so screen readers/users see progress
                 await new Promise(r => setTimeout(r, 50));
+                if (!object3D || typeof object3D.traverse !== 'function') {
+                    throw new Error('Geometry build failed. Please adjust settings and try again.');
+                }
                 const stlBlob = exportObjectToAsciiSTL(object3D, `braille_${plateType}_${shapeType}`);
                 if (lastSTLUrl) URL.revokeObjectURL(lastSTLUrl);
                 lastSTLUrl = URL.createObjectURL(stlBlob);
