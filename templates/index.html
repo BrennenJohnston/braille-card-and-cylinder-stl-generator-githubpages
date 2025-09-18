@@ -1540,8 +1540,25 @@
                         <div class="grade-note" style="margin-bottom: 0.8em; font-size: 0.85em;">
                             <strong>Note:</strong> Contracted braille combines letters into single cells, so the character limit is only confirmed <em>after translation</em> — the program will warn you automatically if it's too long.
                         </div>
+                        <!-- Placement mode toggle -->
+                        <div class="line-input-mode-toggle" style="margin-bottom: 0.8em; display: flex; align-items: center; gap: 1em;">
+                            <label class="line-label" for="placement_mode_auto" style="margin: 0;">Placement Mode:</label>
+                            <label style="display:flex; align-items:center; gap:6px;">
+                                <input type="radio" name="placement_mode" value="auto" id="placement_mode_auto" checked>
+                                Auto Placement
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px;">
+                                <input type="radio" name="placement_mode" value="manual" id="placement_mode_manual">
+                                Manual Placement
+                            </label>
+                        </div>
+                        <!-- Auto placement textarea (shown when Auto is selected) -->
+                        <div id="auto-text-container" style="margin-bottom: 0.8em;">
+                            <label for="auto-text" class="line-label">Auto Placement Text</label>
+                            <textarea id="auto-text" name="auto_text" rows="4" style="width: 100%; border: 1.5px solid var(--border-secondary); border-radius: 8px; padding: 0.8em; font-size: 1em; font-family: inherit; background: var(--bg-primary); color: var(--text-primary);"></textarea>
+                        </div>
                         <!-- Dynamic line inputs container -->
-                        <div id="dynamic-line-inputs">
+                        <div id="dynamic-line-inputs" style="display: none;">
                             <!-- Line inputs will be dynamically generated here based on grid_rows value -->
                         </div>
                     </fieldset>
@@ -1627,6 +1644,13 @@
                             </div>
                         </fieldset>
                     </div>
+                    <!-- Reset Settings moved under Plate selection (outside Expert Mode) -->
+                    <div class="grade-selection">
+                        <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Reset Settings</label>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" id="reset-defaults-btn" title="Reset all settings to defaults">Reset all setting to default</button>
+                        </div>
+                    </div>
                     
                     <div class="expert-mode-toggle">
                         <button type="button" id="expert-toggle" class="expert-toggle-btn">
@@ -1636,6 +1660,16 @@
                     </div>
 
                     <div id="expert-settings" class="expert-settings" style="display: none;">
+                        <!-- Preview button at top of Expert Mode with preview viewer directly below -->
+                        <div class="grade-selection">
+                            <div style="text-align: center;">
+                                <button type="button" id="preview-braille-btn">Preview Braille Translation</button>
+                            </div>
+                            <div id="braille-preview" class="braille-preview" style="display: none;" role="region" aria-label="Braille translation preview">
+                                <h3 class="preview-heading">Braille Translation Preview:</h3>
+                                <div id="preview-content"></div>
+                            </div>
+                        </div>
                         <!-- Output Shape Selection (moved into Expert Mode) -->
                         <div class="grade-selection">
                             <fieldset>
@@ -1658,14 +1692,7 @@
                         <div class="expert-info" role="note" aria-label="Expert mode information">
                             Any changes made here will affect both plates.
                         </div>
-                        <!-- Reset settings and preview controls -->
-                        <div class="grade-selection">
-                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Utilities</label>
-                            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                                <button type="button" id="reset-settings-btn" title="Reset all settings to defaults">Reset all settings to default</button>
-                                <button type="button" id="preview-braille-btn">Preview Braille Translation</button>
-                            </div>
-                        </div>
+                        
                         <div class="grade-selection">
                             <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Braille Spacing</label>
                             <div>
@@ -1824,19 +1851,7 @@
                         </div>
 
                         <div class="grade-selection">
-                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Placement Mode</label>
-                            <div>
-                                <label for="placement_mode">Mode:</label>
-                                <select id="placement_mode" name="placement_mode">
-                                    <option value="auto" selected>Auto Placement</option>
-                                    <option value="manual">Manual Placement (per-line)</option>
-                                </select>
-                            </div>
-                            <div id="manual-placement" style="display:none; margin-top:8px;">
-                                <label for="manual_start_offsets">Manual line start offsets (mm, JSON array of length grid_rows):</label>
-                                <input type="text" id="manual_start_offsets" name="manual_start_offsets" placeholder='e.g., [0,0,0,0]' value="[0,0,0,0]" />
-                            </div>
-                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700; margin-top: 10px;">Braille / Card Positioning</label>
+                            <label class="grade-label" style="font-size: 1.2em; font-weight: 700;">Braille / Card Positioning</label>
                             <div>
                                 <label for="braille_y_adjust">Y Adjust:</label>
                                 <input type="number" id="braille_y_adjust" name="braille_y_adjust" value="0.0" step="0.1">
@@ -1871,20 +1886,13 @@
                             </div>
                         </div>
                         
-                        <div style="margin-top: 1.5em; text-align: center;">
-                            <button type="button" id="preview-braille-btn">Preview Braille Translation</button>
-                        </div>
+                        
                     </div>
 
                     <div class="button-group">
                         <!-- Test buttons removed as they are no longer needed -->
                     </div>
                 </form>
-                
-                <div id="braille-preview" class="braille-preview" style="display: none;" role="region" aria-label="Braille translation preview">
-                    <h3 class="preview-heading">Braille Translation Preview:</h3>
-                    <div id="preview-content"></div>
-                </div>
             </div>
         </div>
     </div>
@@ -2656,19 +2664,19 @@
             });
         }
 
-        // Placement mode UI
-        const placementMode = document.getElementById('placement_mode');
-        const manualPlacement = document.getElementById('manual-placement');
-        const manualOffsets = document.getElementById('manual_start_offsets');
-        if (placementMode && manualPlacement) {
-            placementMode.addEventListener('change', () => {
-                manualPlacement.style.display = placementMode.value === 'manual' ? 'block' : 'none';
-                resetToGenerateState();
-            });
+        // Placement mode UI (radio-based)
+        const placementRadios = document.querySelectorAll('input[name="placement_mode"]');
+        const autoTextContainer = document.getElementById('auto-text-container');
+        const dynamicInputsContainer = document.getElementById('dynamic-line-inputs');
+        function updatePlacementUI() {
+            const mode = document.querySelector('input[name="placement_mode"]:checked')?.value || 'manual';
+            const showAuto = mode === 'auto';
+            if (autoTextContainer) autoTextContainer.style.display = showAuto ? 'block' : 'none';
+            if (dynamicInputsContainer) dynamicInputsContainer.style.display = showAuto ? 'none' : 'block';
+            resetToGenerateState();
         }
-        if (manualOffsets) {
-            manualOffsets.addEventListener('input', resetToGenerateState);
-        }
+        placementRadios.forEach(r => r.addEventListener('change', updatePlacementUI));
+        updatePlacementUI();
 
         // Indicator shape
         const indicatorShape = document.getElementById('indicator_shape');
@@ -2676,31 +2684,83 @@
             indicatorShape.addEventListener('change', resetToGenerateState);
         }
 
-        // Reset settings
-        const resetBtn = document.getElementById('reset-settings-btn');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
-                const defaults = {
-                    grid_columns: '12', grid_rows: '4', cell_spacing: '6.5', line_spacing: '10.0', dot_spacing: '2.5',
-                    left_margin: '8', top_margin: '8',
-                    emboss_dot_cylinder_diameter: '1.5', emboss_dot_cylinder_height: '0.1', emboss_dot_dome_height: '0.5',
-                    cone_dot_base_diameter: '1.5', cone_dot_height: '0.6', dot_shape: 'rounded',
-                    counter_plate_dot_cylinder_diameter: '1.5', counter_plate_dot_cylinder_height: '0.1', counter_plate_dot_dome_height: '0.5',
-                    counter_plate_dot_size_offset: '0.0', counter_plate_recess_shape: 'hemisphere',
-                    card_width: '90', card_height: '52', card_thickness: '2.0',
-                    cylinder_diameter_mm: '31.35', cylinder_height_mm: '52', cylinder_polygonal_cutout_radius_mm: '13', cylinder_polygonal_cutout_sides: '12', seam_offset_deg: '355',
-                    braille_x_adjust: '0.0', braille_y_adjust: '0.0', indicator_recess_depth: '0.5',
-                    placement_mode: 'auto', manual_start_offsets: '[0,0,0,0]', indicator_shape: 'standard',
-                    quality: 'draft'
-                };
-                Object.entries(defaults).forEach(([id, val]) => {
-                    const el = document.getElementById(id);
-                    if (!el) return;
-                    if (el.tagName === 'SELECT') el.value = val; else el.value = val;
+        // Reset settings to first-load defaults (matches reference behavior)
+        const resetDefaultsBtn = document.getElementById('reset-defaults-btn');
+        if (resetDefaultsBtn) {
+            resetDefaultsBtn.addEventListener('click', () => {
+                // 1) Reset selects to their initial default option
+                const selectEls = Array.from(document.querySelectorAll('select'));
+                selectEls.forEach(sel => {
+                    sel.value = sel.options[0]?.value || sel.defaultValue;
                 });
-                if (manualPlacement) manualPlacement.style.display = 'none';
-                if (coneDims) coneDims.style.display = 'none';
+
+                // Force language select to English (UEB) uncontracted (grade 1) if present
+                try {
+                    const desiredDefault = 'en-ueb-g1.ctb';
+                    const languageSel = document.getElementById('language-table');
+                    if (languageSel) {
+                        const hasDesired = Array.from(languageSel.options).some(o => o.value === desiredDefault);
+                        if (hasDesired) languageSel.value = desiredDefault;
+                    }
+                } catch (_) {}
+
+                // 2) Reset radio groups to defaultChecked
+                const radioGroups = {};
+                document.querySelectorAll('input[type="radio"]').forEach(r => {
+                    const name = r.name || Math.random().toString(36).slice(2);
+                    if (!radioGroups[name]) radioGroups[name] = [];
+                    radioGroups[name].push(r);
+                });
+                Object.values(radioGroups).forEach(group => {
+                    const def = group.find(r => r.defaultChecked);
+                    if (def) def.checked = true; else if (group[0]) group[0].checked = true;
+                });
+
+                // Explicitly default to placement auto and cylinder/positive
+                const placementAuto = document.getElementById('placement_mode_auto');
+                if (placementAuto) placementAuto.checked = true;
+                const shapeCylinder = document.querySelector('input[name="shape_type"][value="cylinder"]');
+                if (shapeCylinder) shapeCylinder.checked = true;
+                const platePositive = document.querySelector('input[name="plate_type"][value="positive"]');
+                if (platePositive) platePositive.checked = true;
+
+                // 3) Reset input fields to defaultValue
+                document.querySelectorAll('input[type="number"], input[type="text"]').forEach(inp => {
+                    if (inp.defaultValue !== undefined) inp.value = inp.defaultValue;
+                });
+
+                // 4) Clear auto-text, recreate manual lines to default grid_rows, and update placement UI
+                const autoText = document.getElementById('auto-text');
+                if (autoText) autoText.value = '';
+                const gridRowsDefault = parseInt(document.getElementById('grid_rows')?.defaultValue || '4') || 4;
+                createDynamicLineInputs(gridRowsDefault);
+                updatePlacementUI();
+
+                // 5) Reset expert mode visibility (hidden on first load)
+                const expertSettings = document.getElementById('expert-settings');
+                if (expertSettings) expertSettings.style.display = 'none';
+                const expertToggleTextNow = document.getElementById('expert-toggle-text');
+                if (expertToggleTextNow) expertToggleTextNow.textContent = 'Show Expert Mode';
+
+                // 6) Update dependent labels/settings
+                updateGridColumnsForPlateType();
+                updateShapeSettings();
+
+                // 7) Clear preview and reset button state
+                const preview = document.getElementById('braille-preview');
+                if (preview) preview.style.display = 'none';
+                const previewContentEl = document.getElementById('preview-content');
+                if (previewContentEl) previewContentEl.innerHTML = '';
                 resetToGenerateState();
+
+                // 8) Optionally inform user
+                const errorTextEl = document.getElementById('error-text');
+                const errorDivEl = document.getElementById('error-message');
+                if (errorTextEl && errorDivEl) {
+                    errorTextEl.textContent = 'Settings reset to defaults.';
+                    errorDivEl.style.display = 'flex';
+                    errorDivEl.className = 'error-message info';
+                }
             });
         }
             
@@ -2798,7 +2858,7 @@
             }
         }
 
-        // Function to create dynamic line inputs based on grid_rows value
+        // Function to create dynamic line inputs based on grid_rows value (Manual Placement)
         function createDynamicLineInputs(numLines) {
             const container = document.getElementById('dynamic-line-inputs');
             container.innerHTML = ''; // Clear existing inputs
@@ -2807,9 +2867,18 @@
                 const lineDiv = document.createElement('div');
                 lineDiv.className = 'line-input';
                 lineDiv.innerHTML = `
-                    <label for="line${i}" class="line-label">Line ${i}</label>
-                    <input type="text" id="line${i}" name="line${i}" placeholder="Enter English text here..." maxlength="50" aria-describedby="line${i}-help">
-                    <span id="line${i}-help" class="sr-only">Maximum 50 characters for line ${i}</span>
+                    <div style="display:flex; flex-direction:column; width:100%; gap:6px;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span class="line-label">Line ${i} Translation</span>
+                            <select id="language_table_line_${i}" name="language_table_line_${i}" class="language-select" aria-label="Language for line ${i}">
+                                <option value="en-ueb-g1.ctb" selected>English (UEB), United States – uncontracted (grade 1)</option>
+                                <option value="en-ueb-g2.ctb">English (UEB), United States – contracted (grade 2)</option>
+                            </select>
+                        </div>
+                        <label for="line${i}" class="line-label">Line ${i}</label>
+                        <input type="text" id="line${i}" name="line${i}" placeholder="Enter English text here..." maxlength="50" aria-describedby="line${i}-help">
+                        <span id="line${i}-help" class="sr-only">Maximum 50 characters for line ${i}</span>
+                    </div>
                 `;
                 container.appendChild(lineDiv);
             }
@@ -2818,15 +2887,20 @@
             addInputChangeListeners();
         }
 
-        // Function to collect all dynamic line values
+        // Function to collect line values depending on placement mode
         function getDynamicLineValues() {
+            const mode = document.querySelector('input[name="placement_mode"]:checked')?.value || 'manual';
+            if (mode === 'auto') {
+                const autoText = (document.getElementById('auto-text')?.value || '').toString();
+                return [autoText]; // single blob, will be wrapped later
+            }
             const gridRows = parseInt(document.getElementById('grid_rows').value) || 4;
             const lines = [];
             for (let i = 1; i <= gridRows; i++) {
                 const input = document.getElementById(`line${i}`);
                 lines.push(input ? input.value : '');
             }
-            // Ensure we always return at least 4 lines for backend compatibility
+            // Ensure we always return at least 4 lines for backend compatibility (manual only)
             while (lines.length < 4) {
                 lines.push('');
             }
@@ -2945,19 +3019,31 @@
             errorDiv.style.display = 'none';
             let previewHTML = '';
             
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].trim()) {
-                    try {
-                        // Use real liblouis translation with selected table
-                        const braille = await translateWithLiblouis(lines[i].trim(), 'g2', tableName);
-                        previewHTML += `<div class="preview-line-success">
-                            <strong>Line ${i + 1}:</strong> "${lines[i].trim()}" → "${braille}"
-                        </div>`;
-                    } catch (error) {
-                        log.error('Translation failed for line', i + 1, ':', error);
-                        previewHTML += `<div class="preview-line-error">
-                            <strong>Line ${i + 1}:</strong> "${lines[i].trim()}" → Error: ${error.message}
-                        </div>`;
+            const placementMode = document.querySelector('input[name="placement_mode"]:checked')?.value || 'manual';
+            if (placementMode === 'auto') {
+                if (!lines[0] || !lines[0].trim()) {
+                    errorText.textContent = 'Please enter text in the Auto Placement field.';
+                    errorDiv.style.display = 'flex';
+                    return;
+                }
+                try {
+                    const braille = await translateWithLiblouis(lines[0].trim(), 'g2', tableName);
+                    previewHTML += `<div class="preview-line-success"><strong>Auto Placement:</strong> "${lines[0].trim()}" → "${braille}"</div>`;
+                } catch (error) {
+                    log.error('Auto translation failed:', error);
+                    previewHTML += `<div class="preview-line-error"><strong>Auto Placement:</strong> Error: ${error.message}</div>`;
+                }
+            } else {
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].trim()) {
+                        try {
+                            const perLineTable = document.getElementById(`language_table_line_${i + 1}`)?.value || tableName;
+                            const braille = await translateWithLiblouis(lines[i].trim(), 'g2', perLineTable);
+                            previewHTML += `<div class="preview-line-success"><strong>Line ${i + 1}:</strong> "${lines[i].trim()}" → "${braille}"</div>`;
+                        } catch (error) {
+                            log.error('Translation failed for line', i + 1, ':', error);
+                            previewHTML += `<div class="preview-line-error"><strong>Line ${i + 1}:</strong> "${lines[i].trim()}" → Error: ${error.message}</div>`;
+                        }
                     }
                 }
             }
@@ -3080,28 +3166,42 @@
             let translatedLines = [];
             let translationErrors = [];
             if (plateType === 'positive') {
-                // Translate text to braille before sending to backend
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (line) {
-                        try {
-                            log.debug(`Translating line ${i + 1}: '${line}' to braille using table: ${tableName}...`);
-                            const brailleText = await translateWithLiblouis(line, 'g2', tableName);
-                            log.debug(`Line ${i + 1} translated: '${line}' → '${brailleText}'`);
-                            translatedLines.push(brailleText);
-                        } catch (error) {
-                            log.error(`Failed to translate line ${i + 1}:`, error);
-                            // Track translation failure
-                            translationErrors.push({
-                                line: i + 1,
-                                text: line,
-                                error: error.toString()
-                            });
-                            // Push empty string to maintain line alignment
+                const placementMode = document.querySelector('input[name="placement_mode"]:checked')?.value || 'manual';
+                if (placementMode === 'auto') {
+                    const autoFullText = (lines[0] || '').trim();
+                    if (!autoFullText) {
+                        errorText.textContent = 'Please enter text in the Auto Placement field.';
+                        errorDiv.style.display = 'flex';
+                        return;
+                    }
+                    try {
+                        log.debug('Translating auto text using table:', tableName);
+                        const brailleText = await translateWithLiblouis(autoFullText, 'g2', tableName);
+                        translatedLines = [brailleText];
+                    } catch (error) {
+                        log.error('Failed to translate auto text:', error);
+                        translationErrors.push({ line: 1, text: autoFullText, error: error.toString() });
+                        translatedLines = [''];
+                    }
+                } else {
+                    // Manual mode: translate each line with per-line language if provided
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (line) {
+                            try {
+                                const perLineTable = document.getElementById(`language_table_line_${i + 1}`)?.value || tableName;
+                                log.debug(`Translating line ${i + 1}: '${line}' to braille using table: ${perLineTable}...`);
+                                const brailleText = await translateWithLiblouis(line, 'g2', perLineTable);
+                                log.debug(`Line ${i + 1} translated: '${line}' → '${brailleText}'`);
+                                translatedLines.push(brailleText);
+                            } catch (error) {
+                                log.error(`Failed to translate line ${i + 1}:`, error);
+                                translationErrors.push({ line: i + 1, text: line, error: error.toString() });
+                                translatedLines.push('');
+                            }
+                        } else {
                             translatedLines.push('');
                         }
-                    } else {
-                        translatedLines.push('');
                     }
                 }
                 log.debug('Original lines:', lines);
@@ -3163,8 +3263,8 @@
                 card_thickness: document.getElementById('card_thickness').value,
                 braille_x_adjust: document.getElementById('braille_x_adjust').value,
                 braille_y_adjust: document.getElementById('braille_y_adjust').value,
-                placement_mode: document.getElementById('placement_mode').value,
-                manual_start_offsets: document.getElementById('manual_start_offsets').value,
+                placement_mode: (document.querySelector('input[name="placement_mode"]:checked')?.value || 'manual'),
+                manual_start_offsets: (document.getElementById('manual_start_offsets')?.value || ''),
                 indicator_shape: document.getElementById('indicator_shape').value
             };
             
@@ -3180,11 +3280,11 @@
                 return;
             }
             
-            // Validate braille character limits AFTER translation
+            // Validate braille character limits AFTER translation (manual mode only for cards)
             const gridColumnsValue = parseInt(document.getElementById('grid_columns').value);
-            if (plateType === 'positive') {
+            const placementModeNow = (document.querySelector('input[name="placement_mode"]:checked')?.value || 'manual');
+            if (plateType === 'positive' && placementModeNow === 'manual') {
                 // For embossing plates, we need to account for 2 reserved cells
-                // Use the actual grid columns value from the input (not hardcoded)
                 const actualGridColumns = gridColumnsValue + 2; // Add back the 2 reserved cells
                 const availableColumns = gridColumnsValue; // What the user sees is available cells
                 
@@ -3198,7 +3298,7 @@
                         return;
                     }
                 }
-            } else {
+            } else if (plateType !== 'positive') {
                 // For counter plates, all grid columns are available
                 for (let i = 0; i < translatedLines.length; i++) {
                     const brailleLine = translatedLines[i];
