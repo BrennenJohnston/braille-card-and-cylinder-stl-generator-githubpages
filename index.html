@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Braille Plate & Cylinder STL Generator</title>
-    <meta http-equiv="refresh" content="0; url=templates/index.html" />
+    <meta http-equiv="refresh" content="0; url=/braille-card-and-cylinder-stl-generator-githubpages/templates/index.html" />
     <link rel="icon" href="static/favicon.svg" />
     <script>
-        // Fallback redirect if meta refresh is blocked
+        // Robust redirect that preserves the GitHub Pages repo prefix
         (function(){
-            var target = 'templates/index.html';
-            if (location.pathname.endsWith('/') || location.pathname.endsWith('/index.html')) {
+            var repo = 'braille-card-and-cylinder-stl-generator-githubpages';
+            var target = '/' + repo + '/templates/index.html';
+            if (location.pathname !== target) {
                 window.location.replace(target);
             }
         })();
@@ -20,9 +21,9 @@
         a { color: #2563eb; }
     </style>
     <noscript>
-        <meta http-equiv="refresh" content="0;url=templates/index.html" />
+        <meta http-equiv="refresh" content="0;url=/braille-card-and-cylinder-stl-generator-githubpages/templates/index.html" />
     </noscript>
-    <link rel="canonical" href="templates/index.html" />
+    <link rel="canonical" href="/braille-card-and-cylinder-stl-generator-githubpages/templates/index.html" />
     
 </head>
 <body>

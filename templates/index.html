@@ -9,19 +9,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Braille Plate & Cylinder STL Generator</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="icon" href="../static/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/braille-card-and-cylinder-stl-generator-githubpages/static/favicon.svg" type="image/svg+xml">
     <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
     <script type="importmap">
         {
             "imports": {
-                "three": "../static/three.module.js",
+                "three": "/braille-card-and-cylinder-stl-generator-githubpages/static/three.module.js",
                 "three-mesh-bvh": "https://unpkg.com/three-mesh-bvh@0.7.6?module",
                 "three-bvh-csg": "https://unpkg.com/three-bvh-csg@0.0.17?module"
             },
             "scopes": {
-                "https://unpkg.com/": { "three": "../static/three.module.js" },
-                "https://unpkg.com/three-mesh-bvh@0.7.6/": { "three": "../static/three.module.js" },
-                "https://unpkg.com/three-bvh-csg@0.0.17/": { "three": "../static/three.module.js" }
+                "https://unpkg.com/": { "three": "/braille-card-and-cylinder-stl-generator-githubpages/static/three.module.js" },
+                "https://unpkg.com/three-mesh-bvh@0.7.6/": { "three": "/braille-card-and-cylinder-stl-generator-githubpages/static/three.module.js" },
+                "https://unpkg.com/three-bvh-csg@0.0.17/": { "three": "/braille-card-and-cylinder-stl-generator-githubpages/static/three.module.js" }
             }
         }
     </script>
@@ -1892,10 +1892,10 @@
 
     
     <!-- Load the real liblouis JavaScript implementation from static files -->
-    <script src="../static/liblouis/build-no-tables-utf16.js?v=2025-09-15"></script>
-    <script src="../static/liblouis/easy-api.js?v=2025-09-15"></script>
+    <script src="/braille-card-and-cylinder-stl-generator-githubpages/static/liblouis/build-no-tables-utf16.js?v=2025-09-15"></script>
+    <script src="/braille-card-and-cylinder-stl-generator-githubpages/static/liblouis/easy-api.js?v=2025-09-15"></script>
     <!-- Runtime config for GitHub Pages / external backend -->
-    <script src="../static/app-config.js?v=2025-09-15"></script>
+    <script src="/braille-card-and-cylinder-stl-generator-githubpages/static/app-config.js?v=2025-09-15"></script>
     
     <script type="module">
         // Gate dev-only controls behind ?dev
@@ -1917,10 +1917,10 @@
             } catch (_) {}
         }
         import * as THREE from 'three';
-        import { STLLoader } from '../static/STLLoader.js';
-        import { OrbitControls } from '../static/OrbitControls.js';
-        import { buildCardEmbossingPlate, buildCylinderEmbossingPlate, buildCardCounterPlate, buildCylinderCounterPlate } from '../static/geometry.js';
-        import { exportObjectToAsciiSTL } from '../static/export-stl.js';
+        import { STLLoader } from '/braille-card-and-cylinder-stl-generator-githubpages/static/STLLoader.js';
+        import { OrbitControls } from '/braille-card-and-cylinder-stl-generator-githubpages/static/OrbitControls.js';
+        import { buildCardEmbossingPlate, buildCylinderEmbossingPlate, buildCardCounterPlate, buildCylinderCounterPlate } from '/braille-card-and-cylinder-stl-generator-githubpages/static/geometry.js';
+        import { exportObjectToAsciiSTL } from '/braille-card-and-cylinder-stl-generator-githubpages/static/export-stl.js';
         // Static GH Pages deployment: disable backend completely
         const API_BASE = '';
         const backendAvailable = false;
@@ -1942,10 +1942,7 @@
             // Load static manifest only (with robust path fallbacks for GitHub Pages)
             let staticData = null;
             const candidateUrls = [
-                new URL('../static/tables-manifest.json', import.meta.url).href,
-                new URL('./static/tables-manifest.json', import.meta.url).href,
-                `${location.origin}/braille-card-and-cylinder-stl-generator-githubpages/static/tables-manifest.json`,
-                `${location.origin}/static/tables-manifest.json`
+                `${location.origin}/braille-card-and-cylinder-stl-generator-githubpages/static/tables-manifest.json`
             ];
             for (const href of candidateUrls) {
                 try {
@@ -3533,7 +3530,7 @@
                 log.debug('Initializing liblouis web worker...');
                 
                 // Construct a worker from a Blob to avoid base-path and CORS issues
-                const staticBase = new URL('../static/', window.location.href).href;
+                const staticBase = `${location.origin}/braille-card-and-cylinder-stl-generator-githubpages/static/`;
                 console.log('Static base URL:', staticBase);
                 const workerSource = `
                     let liblouisInstance = null; let liblouisReady = false;
